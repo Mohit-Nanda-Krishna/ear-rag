@@ -1,0 +1,39 @@
+# EAR-RAG .gitignore
+# Project-specific ignores
+*.venv/
+.env
+.local.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+venv/
+ENV/
+
+# IDE files
+.vscode/
+.idea/
+*.code-workspace
+
+# Outputs and results
+outputs/
+results/
+
+# Downloaded datasets and models
+data/raw/*
+data/processed/*
+data/indexes/*
+models/
+*.pt
+*.pth
+*.bin
+*.h5
+*.hdf5
+
+# Project-specific
+configs/*.yaml
+!configs/config.yaml
+*.yaml
