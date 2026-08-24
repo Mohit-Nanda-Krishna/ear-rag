@@ -12,7 +12,11 @@ from typing import Any
 import yaml
 
 
-_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+# ``loader.py`` lives at ``<repository>/src/ear_rag/config/loader.py``.
+# Derive the repository root from that source-layout location so configuration
+# loading neither depends on the current working directory nor a machine path.
+_PACKAGE_ROOT = Path(__file__).resolve().parents[1]
+_PROJECT_ROOT = _PACKAGE_ROOT.parent.parent
 _DEFAULT_CONFIG_RELATIVE_PATH = Path("configs") / "config.yaml"
 _CONFIG_PATH = _PROJECT_ROOT / _DEFAULT_CONFIG_RELATIVE_PATH
 

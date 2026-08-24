@@ -35,5 +35,7 @@ models/
 
 # Project-specific
 configs/*.yaml
-!configs/config.yaml
 *.yaml
+!configs/config.yaml
+
+ai-proj-new/

@@ -135,7 +135,8 @@ class LocalLexicalRetriever:
         Additional keyword arguments are accepted for compatibility with the
         retrieval protocol but intentionally unused by this local backend.
         """
-        del kwargs
+        retrieval_action = str(kwargs.get("retrieval_action", "initial"))
+        hop_count = kwargs.get("hop_count", 1)
         if top_k <= 0:
             raise ValueError("top_k must be greater than zero")
         if self._max_top_k is not None and top_k > self._max_top_k:
@@ -165,12 +166,15 @@ class LocalLexicalRetriever:
             top_k=top_k,
             metadata={
                 "retriever_name": self._name,
+                "backend_name": self._name,
+                "retrieval_action": retrieval_action,
                 "requested_top_k": top_k,
                 "returned_chunk_count": len(result_chunks),
                 "retrieval_call_count": self._retrieval_call_count,
                 "retrieval_latency_ms": latency_ms,
                 "indexed_document_count": self._indexed_document_count,
                 "indexed_chunk_count": len(self._chunks),
+                "hop_count": hop_count,
             },
         )
 

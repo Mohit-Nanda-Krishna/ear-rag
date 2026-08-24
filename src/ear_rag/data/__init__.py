@@ -10,6 +10,7 @@ from .datasets import (
 from .persistence import RetrievalArtifactStore, RetrievalArtifacts
 from .pipeline import RetrievalDataPipeline
 from .preprocessing import DocumentPreprocessor
+from .normalization import DatasetNormalizer, NormalizedCorpusBuilder, NormalizedDocument, NormalizedExample
 
 __all__ = [
     "SUPPORTED_DATASETS",
@@ -21,4 +22,8 @@ __all__ = [
     "RetrievalArtifacts",
     "RetrievalDataPipeline",
     "adapter_from_config",
+    "DatasetNormalizer",
+    "NormalizedCorpusBuilder",
+    "NormalizedDocument",
+    "NormalizedExample",
 ]

@@ -1,0 +1,74 @@
+project:
+  name: EAR-RAG
+  version: 0.1.0
+
+data:
+  dataset: fixture
+  subset: development
+  split: train
+  maximum_examples: null
+  paths:
+    raw: data/raw
+    processed: data/processed
+    indexes: data/indexes
+    fixture_file: data/fixtures/tiny_retrieval.jsonl
+
+query_analysis:
+  enabled: false
+
+retrieval:
+  backend: local_lexical
+  default_top_k: 5
+  max_top_k: 20
+  chunk_size: 400
+  chunk_overlap: 50
+
+vector:
+  dimensions: 64
+
+hybrid:
+  lexical_weight: 0.5
+  vector_weight: 0.5
+
+multihop:
+  max_hops: 2
+
+chunking:
+  size: 400
+  overlap: 50
+
+evidence_assessment:
+  sufficient_threshold: 0.7
+  uncertain_threshold: 0.4
+  weights:
+    relevance: 0.25
+    coverage: 0.25
+    support: 0.25
+    consistency: 0.25
+
+recovery:
+  max_recovery_rounds: 1
+  # Compatibility alias retained for earlier configuration consumers.
+  max_attempts: 1
+  max_retrieved_chunks: 20
+  recovery_backends:
+    local_lexical: vector_flat
+    vector_flat: hybrid
+    default: hybrid
+
+generation:
+  enabled: false
+
+models:
+  generator: null
+
+evaluation:
+  enabled: false
+
+logging:
+  level: INFO
+
+persistence:
+  enabled: true
+  processed_path: data/processed
+  index_path: data/indexes

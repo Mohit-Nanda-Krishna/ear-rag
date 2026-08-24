@@ -1,5 +1,139 @@
 # EAR-RAG Development Progress
 
+## Phase 1.6C â€” Controlled Retrieval Evaluation and 40% Demonstration
+
+**COMPLETE** (2026-08-24)
+
+- Implemented `python -m ear_rag.demo`: an interactive and scriptable CLI for
+  the normalized HotpotQA default and optional 2Wiki corpus.
+- Added separate comparison mode (BM25-style lexical, vector flat, hybrid, and
+  bounded multi-hop) and EAR-RAG mode, which runs the existing controller only:
+  BM25 initial retrieval, ESA, and at most one configured recovery retrieval.
+- Added retrieved-evidence inspection and deterministic small evaluation (20
+  examples by default) with post-retrieval Hit@k, ESA/control, latency, calls,
+  recovery, and abstention summaries. Retriever documents are constructed only
+  from normalized retriever-safe records; separate evaluation labels are read
+  only when calculating Hit@k afterwards.
+- Cost instrumentation reports actual existing operational proxies: retrieval
+  calls, requested/returned chunks, measured latency, strategies, and recovery
+  rounds. Second ESA insufficiency terminates as `ABSTAIN`; no second recovery
+  is possible.
+- Created: `src/ear_rag/demo.py`, `tests/test_demo.py`, and
+  `docs/demo_40_percent.md`; added `sitecustomize.py` so the existing
+  interpreter can execute the `src`-layout module directly. Modified:
+  `PROGRESS.md`.
+- Known limitations: no LLM answer generation, no monetary-cost model, and the
+  deterministic ESA/vector components are prototype baselines rather than
+  calibrated research results. Validation blocker: this environment's existing
+  interpreter did not resolve `ear_rag` for direct `-m` execution even after a
+  repository startup-path shim; pytest resolves `src` correctly and all tests
+  pass with its configured source path. Stopped after the same direct-module
+  error recurred, per the phase anti-loop rule.
+- Next phase: only proceed to a separately authorized controlled experiment or
+  research evaluation phase.
+
+## Phase 1.6B — Dataset Normalization and Corpus Builder
+
+**COMPLETE** (2026-08-24)
+
+- Implemented typed deterministic normalization for the locally supplied
+  HotpotQA, 2Wiki, and NQ-Open schemas plus a JSONL corpus/evaluation writer.
+- Generated `hotpotqa_normalized.jsonl` (500), `2wiki_normalized.jsonl`
+  (12,576), and `nq_open_normalized.jsonl` (3,610) under `data/processed/`.
+- Generated retriever-safe HotpotQA and 2Wiki corpus JSONL files and separate
+  per-dataset evaluation JSONL files. Corpus records contain no answers,
+  supporting facts, evidences, or support sentence labels.
+- NQ-Open produces QA-only normalized examples and no corpus because its
+  external Wikipedia-corpus requirement remains unresolved by design.
+- Created: `src/ear_rag/data/normalization.py`,
+  `tests/test_dataset_normalization.py`, and processed output artifacts.
+- Modified: `src/ear_rag/data/__init__.py`,
+  `docs/dataset_schema_report.md`, and `PROGRESS.md`.
+- Known limitation: the per-example HotpotQA/2Wiki contexts are a local,
+  closed-world corpus representation; no global external corpus was built.
+- Tests: `.\\ai-proj-new\\Scripts\\python.exe -m pytest` — **57 passed in
+  1.21s**.
+- Next phase: validate/load these artifacts through a controlled retrieval
+  experiment harness; do not address the NQ corpus gap without an explicit
+  corpus input.
+
+## Phase 1.6A — Dataset Schema Inspection
+
+**COMPLETE** (2026-08-24)
+
+- Inspected only the locally supplied NQ-Open (3,610 JSONL QA records),
+  HotpotQA fullwiki subset (500 JSONL records), and 2Wiki validation Parquet
+  (12,576 records); no raw data was modified or downloaded.
+- Finding: NQ-Open has only `question` and answer-list fields, no IDs or
+  contexts, so it requires a separately supplied Wikipedia corpus for final
+  retrieval experiments.
+- Finding: HotpotQA contexts are title plus ordered sentence lists with
+  `_id`, `type`, `level`, and `supporting_facts`; 2Wiki uses parallel
+  `context.title`/`context.sentences` and support title/sentence-ID arrays.
+- Planned corpus boundary: title/text and safe provenance are retriever input;
+  answers, supporting facts, evidences, and support sentence IDs are strictly
+  evaluation-only to prevent leakage.
+- Created: `docs/dataset_schema_report.md`.
+- Modified: `PROGRESS.md`.
+- Tests: `.\\ai-proj-new\\Scripts\\python.exe -m pytest` — **50 passed in
+  0.30s**.
+- Phase 1.6B should implement only a deterministic schema-specific
+  normalization/corpus builder with separate evaluation labels and tests.
+
+## Phase 1.5 Completion — Retrieval Backend Architecture + Bounded ESA/Recovery
+
+**COMPLETE** (2026-08-24)
+
+- Preserved and adapted the BM25-inspired lexical backend; metadata includes backend, initial/recovery action, and hop count.
+- Added deterministic hashed-vector flat cosine retrieval, deterministic hybrid score fusion, and bounded multi-hop evidence aggregation (`max_hops: 2`).
+- Added explainable deterministic ESA using score quality, query/evidence coverage, evidence amount, and duplicate-evidence rate.
+- Added an explicit finite retrieval-control pipeline and configurable recovery policy using operational proxies (calls, chunks, latency, hops).
+
+### Retrieval Backends
+
+- **BM25 / lexical:** existing lightweight BM25-inspired backend retained.
+- **Vector Flat:** deterministic hashed-vector flat search implemented.
+- **Hybrid:** deterministic lexical/vector normalized fusion implemented.
+- **Multi-hop:** bounded deterministic architecture implemented, not an autonomous agent.
+
+### ESA / Cost-Aware Control / Bounded Recovery
+
+ESA returns relevance, coverage, support, consistency, overall score, decision, rationale, and structured signals. The policy only selects a configured alternative backend when ESA is not sufficient and configured operational limits allow it. Default `max_recovery_rounds` is **1** (`max_attempts: 1` remains a compatibility alias); a second ESA always runs after recovery; remaining insufficiency terminates as `abstain`. No uncontrolled loop exists.
+
+### Test Result
+
+`.\\ai-proj-new\\Scripts\\python.exe -m pytest` — **50 passed in 0.31s**. The requested `.\\.venv\\Scripts\\python.exe` path does not exist; this is the available project interpreter.
+
+### Files Created
+
+- `src/ear_rag/retrieval/{vector,hybrid,multihop}.py`
+- `src/ear_rag/evidence/{__init__,esa}.py`
+- `src/ear_rag/routing/{__init__,recovery,pipeline}.py`
+- `tests/test_phase_15_control.py`
+
+### Files Modified
+
+- `src/ear_rag/retrieval/local.py`
+- `src/ear_rag/retrieval/__init__.py`
+- `configs/config.yaml`
+- `PROGRESS.md`
+
+### Known Issues
+
+The vector encoder is deliberately a deterministic, no-download architecture stand-in, not a production semantic-search quality claim.
+
+### Research Components Still Missing
+
+Learned/calibrated ESA and policy, generation, calibrated abstention, baseline experiments, and dataset-scale evaluation.
+
+### Next Phase
+
+Phase 1.6 — controlled baseline/evaluation harness for the bounded controller.
+
+### What We Did / Why It Matters
+
+EAR-RAG can now make one inspectable, bounded recovery decision based on current evidence. This creates the reproducible control surface needed to study when additional retrieval is worth its operational cost.
+
 ## Project
 
 Evidence-Aware Adaptive Retrieval with Selective Query Recovery (EAR-RAG)
@@ -23,6 +157,19 @@ adaptive recovery, generation, and evaluation are not implemented.
 The source package and configuration loader are working. The complete test suite
 passes, and pytest imports the intended `src/ear_rag` package even though the
 empty protected root-level `ear_rag` reparse-point directory remains in place.
+
+### Configuration Path Portability Fix
+
+- Root cause: `configs/config.yaml` was documented and expected by the loader
+  and tests, but was not tracked in Git. Fresh clones therefore lacked the
+  default configuration; stale paths seen in a copied virtual environment were
+  not repository configuration.
+- Fix: restored the tracked default configuration and made the loader derive
+  the repository root explicitly from its `src/ear_rag/config/loader.py`
+  location using `pathlib.Path`.
+- Test result: `python -m pytest` — **45 passed in 0.29s**.
+- Configuration paths are now repository-relative and portable across clone
+  locations; no machine-specific repository path is used.
 
 ## Phase History
 
