@@ -39,3 +39,4 @@ configs/*.yaml
 !configs/config.yaml
 
 ai-proj-new/
+pytest_phase_16c_tmp/

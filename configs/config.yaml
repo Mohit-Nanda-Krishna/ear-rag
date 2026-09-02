@@ -55,6 +55,30 @@ recovery:
     local_lexical: vector_flat
     vector_flat: hybrid
     default: hybrid
+  cost_awareness:
+    # Initial development-set-style deterministic estimates, not calibrated claims.
+    cost_efficiency_threshold: 1.0
+    estimated_esa_gain:
+      default: 0.25
+      vector_flat: 0.25
+      hybrid: 0.30
+    expected_work:
+      default:
+        retrieval_calls: 1
+        retrieved_chunks: 5
+        latency_ms: 10
+      vector_flat:
+        retrieval_calls: 1
+        retrieved_chunks: 5
+        latency_ms: 10
+      hybrid:
+        retrieval_calls: 2
+        retrieved_chunks: 5
+        latency_ms: 20
+    cost_weights:
+      retrieval_calls: 0.05
+      retrieved_chunks: 0.01
+      latency_ms: 0.001
 
 generation:
   enabled: false

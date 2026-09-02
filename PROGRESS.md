@@ -1,5 +1,37 @@
 # EAR-RAG Development Progress
 
+## Phase 1.7 — Cost-Aware Recovery Selection + Demo Update
+
+**COMPLETE** (2026-09-02)
+
+- Inserted deterministic pre-recovery cost-aware selection into
+  `BoundedRecoveryPolicy.decide()`, between initial ESA and the existing
+  recovery call. The finite controller still permits at most one recovery and
+  only runs the second ESA after an accepted recovery.
+- Added the configuration-driven formula
+  `CE_expected = (estimated_esa_after - current_esa) / expected_additional_recovery_cost`.
+  Estimated ESA is current ESA plus a configured per-candidate gain (clamped to
+  1.0). Expected cost is the configured weighted sum of expected additional
+  retrieval calls, retrieved chunks, and latency.
+- Added `recovery.cost_awareness` configuration for threshold, per-backend ESA
+  gains, expected operational work, and explicit cost weights. These are
+  deterministic development-style estimates, not calibrated claims.
+- Updated `python -m ear_rag.demo --mode ear-rag` to show current ESA, the
+  candidate, each estimate, CE threshold decision, actual recovery status,
+  recovery round, optional second ESA, and final decision. A controlled real
+  FAIL case is available with `--query-text "unmatched deterministic vocabulary" --cost-efficiency-threshold 999`.
+- Added focused Phase 1.7 tests for formula components, threshold PASS/FAIL,
+  decision ordering, zero calls on rejection, exactly one call on acceptance,
+  second ESA behavior, abstention, and label isolation.
+- Focused validation: 16 controller/cost-aware/demo tests passed (the new and
+  legacy controller checks plus the demo module). The complete suite was run
+  once but could not collect two existing data tests because this established
+  interpreter lacks `pyarrow`. The direct `python -m ear_rag.demo` command also
+  cannot resolve the `src`-layout package in this interpreter, a pre-existing
+  environment limitation; pytest resolves it correctly.
+- Limitation: estimates are configuration-driven baselines and need later
+  development-set calibration; they do not predict outcome from recovered docs.
+
 ## Phase 1.6C â€” Controlled Retrieval Evaluation and 40% Demonstration
 
 **COMPLETE** (2026-08-24)

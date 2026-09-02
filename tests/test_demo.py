@@ -25,14 +25,19 @@ def test_controller_is_bounded_and_second_esa_runs_when_recovery_occurs():
 
 def test_insufficient_second_esa_abstains_after_exactly_one_recovery():
     runner = DemoRunner()
-    runner.config = {**runner.config, "evidence_assessment": {**runner.config["evidence_assessment"], "sufficient_threshold": 1.0}}
-    result = runner.run_controller(0)
+    result = runner.run_controller(0, query_text="unmatched deterministic vocabulary")
     assert result.recovery_retrieval is not None and result.recovery_assessment is not None
     assert result.final_state == "abstain"
     assert result.recovery_decision.metadata["recovery_round"] == 1
 
 
 def test_cli_noninteractive_ear_rag_prints_cost_summary(capsys):
-    assert main(["--mode", "ear-rag", "--index", "0"]) == 0
+    assert main(["--mode", "ear-rag", "--index", "0", "--query-text", "unmatched deterministic vocabulary"]) == 0
     output = capsys.readouterr().out
     assert "EAR-RAG CONTROLLER" in output and "COST SUMMARY" in output and "Recovery rounds" in output
+    assert "Current ESA" in output and "COST-AWARE DECISION" in output
+
+
+def test_cli_can_demonstrate_cost_aware_rejection(capsys):
+    assert main(["--mode", "ear-rag", "--index", "0", "--query-text", "unmatched deterministic vocabulary", "--cost-efficiency-threshold", "999"]) == 0
+    assert "RECOVERY NOT WORTHWHILE" in capsys.readouterr().out

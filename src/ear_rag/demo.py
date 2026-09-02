@@ -143,15 +143,16 @@ class DemoRunner:
         self.last_results = [item[1] for item in results]
         return results
 
-    def run_controller(self, index: int):
+    def run_controller(self, index: int, *, query_text: str | None = None):
         example = self.get_example(index)
         assessment_config, recovery_config = self.config["evidence_assessment"], self.config["recovery"]
         assessor = DeterministicEvidenceAssessor(
             sufficient_threshold=float(assessment_config["sufficient_threshold"]),
             uncertain_threshold=float(assessment_config["uncertain_threshold"]), weights=assessment_config["weights"],
         )
-        policy = BoundedRecoveryPolicy(max_recovery_rounds=int(recovery_config["max_recovery_rounds"]), recovery_backends=recovery_config["recovery_backends"], max_retrieved_chunks=int(recovery_config["max_retrieved_chunks"]))
-        result = RetrievalControlPipeline(self._fresh_backends(), assessor, policy, top_k=self._top_k()).run(self._query(index), "local_lexical")
+        policy = BoundedRecoveryPolicy(max_recovery_rounds=int(recovery_config["max_recovery_rounds"]), recovery_backends=recovery_config["recovery_backends"], max_retrieved_chunks=int(recovery_config["max_retrieved_chunks"]), cost_awareness=recovery_config["cost_awareness"])
+        query = self._query(index) if query_text is None else Query(example.example_id, query_text, {"dataset": self.dataset})
+        result = RetrievalControlPipeline(self._fresh_backends(), assessor, policy, top_k=self._top_k()).run(query, "local_lexical")
         self.last_results = [result.initial_retrieval] + ([result.recovery_retrieval] if result.recovery_retrieval else [])
         return result
 
@@ -190,16 +191,19 @@ def _print_comparison(runner: DemoRunner, index: int, output: Callable[[str], No
         output(f"Retrieved documents : {len(result.chunks)}\nRetrieval calls      : {result.metadata['retrieval_call_count']}\nRequested top_k      : {result.top_k}\nLatency              : {result.metadata['retrieval_latency_ms']:.2f} ms\nHit@{result.top_k}                : {'YES' if hit else 'NO'}")
 
 
-def _print_controller(runner: DemoRunner, index: int, output: Callable[[str], None] = print) -> None:
-    result = runner.run_controller(index)
+def _print_controller(runner: DemoRunner, index: int, output: Callable[[str], None] = print, query_text: str | None = None) -> None:
+    result = runner.run_controller(index, query_text=query_text)
     output("\n===============================================================\n                  EAR-RAG CONTROLLER\n===============================================================")
     output(f"\nQuestion:\n{result.query.text}\n\nSTEP 1 - INITIAL RETRIEVAL\nStrategy        : BM25\nRetrieval calls : {result.initial_retrieval.metadata['retrieval_call_count']}\nDocuments       : {len(result.initial_retrieval.chunks)}\nLatency         : {result.initial_retrieval.metadata['retrieval_latency_ms']:.2f} ms")
-    output(f"\nSTEP 2 - ESA\nEvidence score  : {result.initial_assessment.overall_score:.3f}\nDecision        : {result.initial_assessment.decision.value.upper()}")
+    decision = result.recovery_decision.metadata
+    output(f"\nSTEP 2 - ESA\nCurrent ESA                  : {result.initial_assessment.overall_score:.3f}\nDecision                     : {result.initial_assessment.decision.value.upper()}")
+    if "candidate_backend" in decision:
+        output(f"\nSTEP 3 - COST-AWARE DECISION\nCandidate recovery           : {decision['candidate_backend']}\nEstimated ESA after recovery : {decision['estimated_esa_after']:.3f}\nExpected evidence gain       : {decision['expected_evidence_gain']:.3f}\nExpected additional cost     : {decision['expected_additional_cost']:.3f}\nExpected cost efficiency     : {decision['expected_cost_efficiency']:.3f}\nCost-efficiency threshold    : {decision['cost_efficiency_threshold']:.3f}\nDecision                     : {'RECOVERY WORTHWHILE' if decision.get('recover') else 'RECOVERY NOT WORTHWHILE'}")
     if result.recovery_retrieval and result.recovery_assessment:
-        output(f"\nSTEP 3 - RECOVERY\nRecovery        : TRIGGERED\nStrategy        : {result.recovery_retrieval.retriever_name}\nRound           : 1 / 1")
-        output(f"\nSTEP 4 - SECOND ESA\nEvidence score  : {result.recovery_assessment.overall_score:.3f}\nDecision        : {result.recovery_assessment.decision.value.upper()}")
+        output(f"\nSTEP 4 - RECOVERY\nRecovery performed           : YES\nRecovery round               : 1 / 1\nStrategy                     : {result.recovery_retrieval.retriever_name}")
+        output(f"\nSTEP 5 - SECOND ESA\nFinal ESA                    : {result.recovery_assessment.overall_score:.3f}\nDecision                     : {result.recovery_assessment.decision.value.upper()}")
     else:
-        output("\nSTEP 3 - RECOVERY\nRecovery        : NOT REQUIRED\nRound           : 0 / 1")
+        output("\nSTEP 4 - RECOVERY\nRecovery performed           : NO\nRecovery round               : 0 / 1")
     output(f"\nCOST SUMMARY\nInitial retrieval calls : {result.initial_retrieval.metadata['retrieval_call_count']}\nRecovery calls          : {result.recovery_retrieval.metadata['retrieval_call_count'] if result.recovery_retrieval else 0}\nTotal retrieval calls   : {result.total_retrieval_calls}\nRecovery rounds         : {1 if result.recovery_retrieval else 0} / 1\nTotal latency           : {result.total_latency_ms:.2f} ms\n\nFinal decision          : {'ANSWERABLE' if result.final_state == 'generate' else 'ABSTAIN'}")
 
 
@@ -227,10 +231,18 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--mode", choices=("compare", "ear-rag", "evidence", "evaluate"))
     parser.add_argument("--index", type=int, default=0, help="deterministic zero-based example index")
     parser.add_argument("--examples", type=int, default=20, help="evaluation example count")
+    parser.add_argument("--cost-efficiency-threshold", type=float, help="override the configured threshold for a deterministic PASS/FAIL demo")
+    parser.add_argument("--query-text", help="run a supplied query against the selected dataset corpus")
     args = parser.parse_args(argv)
     runner = DemoRunner(args.dataset)
+    if args.cost_efficiency_threshold is not None:
+        recovery = dict(runner.config["recovery"])
+        cost_awareness = dict(recovery["cost_awareness"])
+        cost_awareness["cost_efficiency_threshold"] = args.cost_efficiency_threshold
+        recovery["cost_awareness"] = cost_awareness
+        runner.config = {**runner.config, "recovery": recovery}
     if args.mode == "compare": _print_comparison(runner, args.index)
-    elif args.mode == "ear-rag": _print_controller(runner, args.index)
+    elif args.mode == "ear-rag": _print_controller(runner, args.index, query_text=args.query_text)
     elif args.mode == "evidence": _print_evidence(runner.last_results)
     elif args.mode == "evaluate": _print_evaluation(runner, args.examples)
     else:
