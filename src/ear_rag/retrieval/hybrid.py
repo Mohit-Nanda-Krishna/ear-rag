@@ -2,10 +2,12 @@
 from __future__ import annotations
 from collections.abc import Sequence
 from time import perf_counter
+from typing import cast
+from ear_rag.core.interfaces import IndexableRetriever
 from ear_rag.core.models import Document, Query, RetrievedChunk, RetrievalResult
 
 class HybridRetriever:
-    def __init__(self, lexical: object, vector: object, *, lexical_weight: float = .5,
+    def __init__(self, lexical: IndexableRetriever, vector: IndexableRetriever, *, lexical_weight: float = .5,
                  vector_weight: float = .5, name: str = "hybrid") -> None:
         if lexical_weight < 0 or vector_weight < 0 or lexical_weight + vector_weight == 0:
             raise ValueError("hybrid weights must be non-negative and non-zero together")
@@ -33,6 +35,8 @@ class HybridRetriever:
         return RetrievalResult(query.query_id, chunks, self._name, top_k, {
             "retriever_name": self._name, "backend_name": self._name, "retrieval_action": str(kwargs.get("retrieval_action", "initial")),
             "requested_top_k": top_k, "returned_chunk_count": len(chunks), "retrieval_call_count": self._calls * 2,
+            "retrieval_calls": cast(int, lexical.metadata.get("retrieval_calls", 1)) + cast(int, vector.metadata.get("retrieval_calls", 1)),
+            "retrieved_passages": len(lexical.chunks) + len(vector.chunks),
             "retrieval_latency_ms": (perf_counter()-started)*1000, "indexed_document_count": lexical.metadata["indexed_document_count"],
             "indexed_chunk_count": lexical.metadata["indexed_chunk_count"], "hop_count": kwargs.get("hop_count", 1),
             "fusion": {"lexical_weight": self._lexical_weight, "vector_weight": self._vector_weight},

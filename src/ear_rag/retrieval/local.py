@@ -171,6 +171,8 @@ class LocalLexicalRetriever:
                 "requested_top_k": top_k,
                 "returned_chunk_count": len(result_chunks),
                 "retrieval_call_count": self._retrieval_call_count,
+                "retrieval_calls": 1,
+                "retrieved_passages": len(result_chunks),
                 "retrieval_latency_ms": latency_ms,
                 "indexed_document_count": self._indexed_document_count,
                 "indexed_chunk_count": len(self._chunks),

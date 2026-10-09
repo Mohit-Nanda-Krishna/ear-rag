@@ -1,0 +1,35 @@
+[
+  {
+    "id": "exact",
+    "question": "Locate XJ-42 reference details",
+    "documents": [{"id": "manual", "text": "XJ-42 reference details: this controller regulates solar power."}],
+    "supporting_document_ids": ["manual"]
+  },
+  {
+    "id": "concept",
+    "question": "Explain how solar panels generate electricity",
+    "documents": [{"id": "solar", "text": "Solar panels generate electricity when sunlight releases electrons in silicon."}],
+    "supporting_document_ids": ["solar"]
+  },
+  {
+    "id": "mixed",
+    "question": "Explain how XJ-42 regulates solar power",
+    "documents": [{"id": "regulator", "text": "XJ-42 regulates solar power by adjusting current."}],
+    "supporting_document_ids": ["regulator"]
+  },
+  {
+    "id": "dependent",
+    "question": "Where was the author of Golden River born?",
+    "documents": [
+      {"id": "book", "text": "Golden River is a book. Its author is Mira Sen."},
+      {"id": "person", "text": "Mira Sen was born in Pune."}
+    ],
+    "supporting_document_ids": ["book", "person"]
+  },
+  {
+    "id": "ambiguous",
+    "question": "solar electricity",
+    "documents": [{"id": "overview", "text": "Solar electricity is renewable energy."}],
+    "supporting_document_ids": ["overview"]
+  }
+]

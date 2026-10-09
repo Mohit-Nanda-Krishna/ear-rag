@@ -14,7 +14,19 @@ data:
     fixture_file: data/fixtures/tiny_retrieval.jsonl
 
 query_analysis:
-  enabled: false
+  enabled: true
+  policy: query_features_v1
+  fallback_backend: local_lexical
+  eligible_backends: [local_lexical, vector_flat, hybrid, multihop]
+  minimum_score: 1.0
+  minimum_margin: 0.25
+  tie_break_order: [local_lexical, vector_flat, hybrid, multihop]
+  # Provisional heuristic suitability scores, not probabilities or measured quality.
+  weights:
+    local_lexical: {exact_anchor: 4.0}
+    vector_flat: {conceptual: 3.0}
+    hybrid: {exact_anchor: 1.0, conceptual: 1.0, mixed: 4.0}
+    multihop: {dependent: 8.0}
 
 retrieval:
   backend: local_lexical

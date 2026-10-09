@@ -57,6 +57,7 @@ class DeterministicVectorRetriever:
             "retrieval_action": str(kwargs.get("retrieval_action", "initial")),
             "requested_top_k": top_k, "returned_chunk_count": len(chunks),
             "retrieval_call_count": self._retrieval_call_count,
+            "retrieval_calls": 1, "retrieved_passages": len(chunks),
             "retrieval_latency_ms": (perf_counter() - started) * 1000,
             "indexed_document_count": self._indexed_document_count,
             "indexed_chunk_count": len(self._chunks), "hop_count": kwargs.get("hop_count", 1),

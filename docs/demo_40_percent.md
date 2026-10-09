@@ -3,6 +3,7 @@
 Start the interactive demo with:
 
 ```powershell
+$env:PYTHONPATH = "$PWD\src"
 .\ai-proj-new\Scripts\python.exe -m ear_rag.demo
 ```
 
@@ -19,8 +20,12 @@ is deliberately excluded because it has no local retrieval corpus.
 The menu offers comparison mode, EAR-RAG controller mode, retrieved-evidence
 viewing, and a small preliminary evaluation (20 deterministic first examples by
 default). Comparison runs BM25-style lexical, vector-flat, hybrid, and
-multi-hop retrieval independently. EAR-RAG mode instead runs only its initial
-BM25 retrieval and, if ESA is insufficient, one configured recovery backend.
+multi-hop retrieval independently. EAR-RAG mode analyzes the query and selects
+one initial strategy, then runs existing ESA and, if warranted, one configured
+recovery backend. Set `query_analysis.enabled: false` to preserve the configured
+`retrieval.backend`. The displayed routing scores are provisional suitability
+scores, not probabilities. See [initial routing](initial_routing.md) for policy,
+fallback, backend limitations, and isolated offline evaluation commands.
 
 Every result reports operational cost proxies: retrieval calls, requested and
 returned chunks, measured retrieval latency, recovery rounds, and selected

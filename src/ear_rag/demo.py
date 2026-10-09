@@ -8,10 +8,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
+from ear_rag.core.interfaces import Retriever
 from ear_rag.config.loader import get_config_path, load_config
 from ear_rag.core.models import Document, Query, RetrievalResult
 from ear_rag.evidence import DeterministicEvidenceAssessor
@@ -22,7 +25,8 @@ from ear_rag.retrieval import (
     LocalLexicalRetriever,
     MultiHopRetriever,
 )
-from ear_rag.routing import BoundedRecoveryPolicy, RetrievalControlPipeline
+from ear_rag.routing import BoundedRecoveryPolicy, RetrievalControlPipeline, RetrievalControlResult
+from ear_rag.routing.pipeline import underlying_calls
 
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -61,7 +65,7 @@ def load_demo_dataset(dataset: str) -> list[DemoExample]:
     return examples
 
 
-def _read_jsonl(path: Path) -> Iterable[dict[str, object]]:
+def _read_jsonl(path: Path) -> Iterable[dict[str, Any]]:
     with path.open(encoding="utf-8") as source:
         for line in source:
             if line.strip():
@@ -100,7 +104,7 @@ def _all_documents(examples: Iterable[DemoExample]) -> list[Document]:
     return documents
 
 
-def build_backends(documents: list[Document], config: Mapping[str, object] | None = None) -> dict[str, object]:
+def build_backends(documents: list[Document], config: Mapping[str, Any] | None = None) -> dict[str, Retriever]:
     """Index the existing deterministic retrievers over retriever-safe documents."""
     config = config or load_config(get_config_path())
     retrieval = config["retrieval"]
@@ -125,7 +129,7 @@ class DemoRunner:
         self.config = load_config(get_config_path())
         self.last_results: list[RetrievalResult] = []
 
-    def _fresh_backends(self) -> dict[str, object]:
+    def _fresh_backends(self) -> dict[str, Retriever]:
         return build_backends(_all_documents(self.examples), self.config)
 
     def get_example(self, index: int) -> DemoExample:
@@ -143,7 +147,7 @@ class DemoRunner:
         self.last_results = [item[1] for item in results]
         return results
 
-    def run_controller(self, index: int, *, query_text: str | None = None):
+    def run_controller(self, index: int, *, query_text: str | None = None) -> RetrievalControlResult:
         example = self.get_example(index)
         assessment_config, recovery_config = self.config["evidence_assessment"], self.config["recovery"]
         assessor = DeterministicEvidenceAssessor(
@@ -152,11 +156,15 @@ class DemoRunner:
         )
         policy = BoundedRecoveryPolicy(max_recovery_rounds=int(recovery_config["max_recovery_rounds"]), recovery_backends=recovery_config["recovery_backends"], max_retrieved_chunks=int(recovery_config["max_retrieved_chunks"]), cost_awareness=recovery_config["cost_awareness"])
         query = self._query(index) if query_text is None else Query(example.example_id, query_text, {"dataset": self.dataset})
-        result = RetrievalControlPipeline(self._fresh_backends(), assessor, policy, top_k=self._top_k()).run(query, "local_lexical")
+        result = RetrievalControlPipeline(
+            self._fresh_backends(), assessor, policy, top_k=self._top_k(),
+            max_top_k=int(self.config["retrieval"]["max_top_k"]),
+            query_analysis=self.config["query_analysis"],
+        ).run(query, str(self.config["retrieval"]["backend"]))
         self.last_results = [result.initial_retrieval] + ([result.recovery_retrieval] if result.recovery_retrieval else [])
         return result
 
-    def evaluate(self, count: int) -> dict[str, object]:
+    def evaluate(self, count: int) -> dict[str, Any]:
         selected = min(max(1, count), len(self.examples))
         method_hits = {name: 0 for name in ("BM25", "Vector Flat", "Hybrid", "Multi-hop")}
         early, recovery, abstain, calls, latency = 0, 0, 0, 0, 0.0
@@ -188,23 +196,26 @@ def _print_comparison(runner: DemoRunner, index: int, output: Callable[[str], No
     output(f"\nQuestion:\n{example.question}")
     for label, result, hit in runner.compare(index):
         output(f"\n{'-' * 63}\n{label}\n{'-' * 63}")
-        output(f"Retrieved documents : {len(result.chunks)}\nRetrieval calls      : {result.metadata['retrieval_call_count']}\nRequested top_k      : {result.top_k}\nLatency              : {result.metadata['retrieval_latency_ms']:.2f} ms\nHit@{result.top_k}                : {'YES' if hit else 'NO'}")
+        output(f"Retrieved documents : {len(result.chunks)}\nRetrieval calls      : {underlying_calls(result)}\nRequested top_k      : {result.top_k}\nLatency              : {result.metadata['retrieval_latency_ms']:.2f} ms\nHit@{result.top_k}                : {'YES' if hit else 'NO'}")
 
 
 def _print_controller(runner: DemoRunner, index: int, output: Callable[[str], None] = print, query_text: str | None = None) -> None:
     result = runner.run_controller(index, query_text=query_text)
+    if result.initial_routing:
+        routing = result.initial_routing
+        output(f"\nINITIAL ROUTING ({routing.policy_version})\nSelected strategy : {routing.selected_strategy}\nHeuristic suitability scores : {routing.suitability_scores}\nReason : {routing.reason}\nFallback : {routing.fallback_reason or 'none'}\nRouting latency : {routing.routing_latency_ms:.3f} ms")
     output("\n===============================================================\n                  EAR-RAG CONTROLLER\n===============================================================")
-    output(f"\nQuestion:\n{result.query.text}\n\nSTEP 1 - INITIAL RETRIEVAL\nStrategy        : BM25\nRetrieval calls : {result.initial_retrieval.metadata['retrieval_call_count']}\nDocuments       : {len(result.initial_retrieval.chunks)}\nLatency         : {result.initial_retrieval.metadata['retrieval_latency_ms']:.2f} ms")
+    output(f"\nQuestion:\n{result.query.text}\n\nSTEP 1 - INITIAL RETRIEVAL\nStrategy        : {result.initial_retrieval.retriever_name}\nRetrieval calls : {underlying_calls(result.initial_retrieval)}\nDocuments       : {len(result.initial_retrieval.chunks)}\nLatency         : {result.initial_retrieval.metadata['retrieval_latency_ms']:.2f} ms")
     decision = result.recovery_decision.metadata
-    output(f"\nSTEP 2 - ESA\nCurrent ESA                  : {result.initial_assessment.overall_score:.3f}\nDecision                     : {result.initial_assessment.decision.value.upper()}")
+    output(f"\nSTEP 2 - ESA\nCurrent ESA                  : {result.initial_assessment.overall_score:.3f}\nDecision                     : {result.initial_assessment.decision.upper()}")
     if "candidate_backend" in decision:
         output(f"\nSTEP 3 - COST-AWARE DECISION\nCandidate recovery           : {decision['candidate_backend']}\nEstimated ESA after recovery : {decision['estimated_esa_after']:.3f}\nExpected evidence gain       : {decision['expected_evidence_gain']:.3f}\nExpected additional cost     : {decision['expected_additional_cost']:.3f}\nExpected cost efficiency     : {decision['expected_cost_efficiency']:.3f}\nCost-efficiency threshold    : {decision['cost_efficiency_threshold']:.3f}\nDecision                     : {'RECOVERY WORTHWHILE' if decision.get('recover') else 'RECOVERY NOT WORTHWHILE'}")
     if result.recovery_retrieval and result.recovery_assessment:
         output(f"\nSTEP 4 - RECOVERY\nRecovery performed           : YES\nRecovery round               : 1 / 1\nStrategy                     : {result.recovery_retrieval.retriever_name}")
-        output(f"\nSTEP 5 - SECOND ESA\nFinal ESA                    : {result.recovery_assessment.overall_score:.3f}\nDecision                     : {result.recovery_assessment.decision.value.upper()}")
+        output(f"\nSTEP 5 - SECOND ESA\nFinal ESA                    : {result.recovery_assessment.overall_score:.3f}\nDecision                     : {result.recovery_assessment.decision.upper()}")
     else:
         output("\nSTEP 4 - RECOVERY\nRecovery performed           : NO\nRecovery round               : 0 / 1")
-    output(f"\nCOST SUMMARY\nInitial retrieval calls : {result.initial_retrieval.metadata['retrieval_call_count']}\nRecovery calls          : {result.recovery_retrieval.metadata['retrieval_call_count'] if result.recovery_retrieval else 0}\nTotal retrieval calls   : {result.total_retrieval_calls}\nRecovery rounds         : {1 if result.recovery_retrieval else 0} / 1\nTotal latency           : {result.total_latency_ms:.2f} ms\n\nFinal decision          : {'ANSWERABLE' if result.final_state == 'generate' else 'ABSTAIN'}")
+    output(f"\nCOST SUMMARY\nInitial retrieval calls : {underlying_calls(result.initial_retrieval)}\nRecovery calls          : {underlying_calls(result.recovery_retrieval) if result.recovery_retrieval else 0}\nTotal retrieval calls   : {result.total_retrieval_calls}\nRecovery rounds         : {1 if result.recovery_retrieval else 0} / 1\nTotal latency           : {result.total_latency_ms:.2f} ms\n\nFinal decision          : {'ANSWERABLE' if result.final_state == 'generate' else 'ABSTAIN'}")
 
 
 def _print_evidence(results: list[RetrievalResult], output: Callable[[str], None] = print) -> None:
@@ -235,6 +246,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--query-text", help="run a supplied query against the selected dataset corpus")
     args = parser.parse_args(argv)
     runner = DemoRunner(args.dataset)
+    logging.basicConfig(level=str(runner.config["logging"]["level"]), format="%(name)s %(levelname)s %(message)s")
     if args.cost_efficiency_threshold is not None:
         recovery = dict(runner.config["recovery"])
         cost_awareness = dict(recovery["cost_awareness"])

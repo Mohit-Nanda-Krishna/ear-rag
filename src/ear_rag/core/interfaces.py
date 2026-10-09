@@ -9,11 +9,12 @@ DO NOT implement algorithmic logic here — only interface contracts.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Protocol, runtime_checkable
 
 from .models import (
     Query,
+    Document,
     RetrievalResult,
     EvidenceAssessment,
     RecoveryAction,
@@ -48,6 +49,12 @@ class Retriever(Protocol):
             RetrievalResult containing the retrieved chunks.
         """
         ...
+
+
+class IndexableRetriever(Retriever, Protocol):
+    """A retriever whose in-memory corpus can be replaced before queries run."""
+
+    def index(self, documents: Sequence[Document]) -> None: ...
 
 
 @runtime_checkable

@@ -1,5 +1,47 @@
 # EAR-RAG Development Progress
 
+## Query-analysis validation and evaluation (2026-10-09)
+
+- Preserved all 500 existing local HotpotQA routing decisions, features, scores,
+  and reason text against a saved baseline. Added fallback/selection codes, score
+  margins and tie/signal diagnostics without changing the policy or recovery.
+- Extended the existing evaluator with per-query JSONL/CSV, full versus locally
+  resolved evidence metrics, seeded sampling/provenance hashes, observed-call
+  efficiency utility, regret, ties, missed opportunities and paired bootstrap CIs.
+- Reproduced the original 13/20 fallbacks: all lacked recognized routing signals.
+  Evaluated all 500 local development queries against 4,957 documents with recovery
+  disabled: 418 queries have resolved supports, 146 are fully resolved; 564/1,000
+  annotated support documents resolve locally. Fallback was 350/500 (70%).
+- Resolved recall@5: lexical 89.71%, hashed vector 12.80%, hybrid 64.23%, bounded
+  multi-hop 89.71%, routed 81.22%. Routed utility agreement 87.56%, mean regret
+  0.10347; 35 missed-evidence cases and 18 equivalent-quality extra-call cases.
+  The router does not improve on lexical in this development check.
+- Validation: 243 tests passed, including 99 new cases; scoped mypy passed for
+  seven modules, whitespace check passed, real and synthetic reports saved under
+  `outputs/query-validation-*`. No dependencies, models or datasets were added.
+- Findings, denominators, examples, limitations and reproducible commands:
+  [docs/query_analysis_validation.md](docs/query_analysis_validation.md).
+
+## Query-aware initial retrieval (2026-10-09)
+
+- Added separate deterministic query features and configurable scoring policy;
+  enabled it in the main runtime configuration. Exactly one initial strategy is
+  dispatched before existing ESA and at most one recovery. Recovery-aware initial
+  selection remains deferred.
+- Added structured decisions, eligibility/fallback checks, query-free INFO logs,
+  separate routing latency, and per-invocation composite retrieval-call accounting.
+- Added an explicitly offline fixed-versus-routed evaluation with recovery disabled,
+  plus a tracked synthetic fixture. Labels remain outside runtime analysis/routing.
+- Validation: 144 tests passed (76 new); scoped mypy passed for ten changed/new
+  source modules. No new dependencies or model downloads.
+- Small HotpotQA development check: 20 queries, 16 with local support labels;
+  local recall@5 was lexical 87.5%, hashed vectors 18.75%, hybrid 68.75%, bounded
+  multi-hop 87.5%, routed 75%. Router overhead averaged 0.095 ms, fallback 65%.
+  Rules remain provisional; no quality-improvement claim. Synthetic smoke passed.
+- Details, reproducible commands, label-coverage caveats and backend limitations:
+  [docs/initial_routing.md](docs/initial_routing.md). Historical phase entries below
+  describe their status at the time and may be superseded by this update.
+
 ## Phase 1.7 — Cost-Aware Recovery Selection + Demo Update
 
 **COMPLETE** (2026-09-02)
