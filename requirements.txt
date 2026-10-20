@@ -1,11 +1,12 @@
 # EAR-RAG Minimal Dependencies
-# This file contains only lightweight dependencies required for the project foundation.
+# Single dependency source for the editable development checkout.
 # Large ML packages (torch, transformers, vllm, sentence-transformers, faiss, chromadb,
 # llama-index, langchain) will be added in later phases after hardware/model strategy is finalized.
 
 # Core dependencies
 pytest>=7.0.0
 pyyaml>=6.0
+pyarrow
 
 # Type checking
 mypy>=1.0

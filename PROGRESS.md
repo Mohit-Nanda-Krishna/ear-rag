@@ -1,5 +1,178 @@
 # EAR-RAG Development Progress
 
+## Reliability Phase 1 (2026-10-20) — completed and verified
+
+This section is the current status. Dated entries below are historical snapshots;
+their old environment, missing-component and next-phase statements are not current.
+
+- Initial branch/status: `main...origin/main`, clean working tree. At baseline no
+  root-level `ear_rag`, `.venv`, `pyproject.toml`, `setup.py`, or `setup.cfg` existed.
+  `pytest.ini` correctly uses `[pytest]`, `testpaths = tests`, `pythonpath = src`.
+- Actual interpreter: `C:\ear-rag\ai-proj-new\Scripts\python.exe`, Python 3.12.4.
+  Relevant installed versions: pytest 9.1.1, PyYAML 6.0.3, pyarrow 25.0.1,
+  mypy 2.3.1, pre-commit 4.6.2. No `PYTHONPATH` was set for the baseline.
+- Baseline command `.\ai-proj-new\Scripts\python.exe -m pytest -q`:
+  **243 passed in 8.53s**. `-m pip check`: **No broken requirements found**.
+- Direct `-c "import ear_rag; print(ear_rag.__file__)"` failed:
+  `ModuleNotFoundError: No module named 'ear_rag'`. Pytest's source-path setup
+  masks the missing package installation; the root `sitecustomize.py` does not
+  automatically solve startup imports in this interpreter.
+- A `git archive` export of HEAD into a new temporary directory, without ignored
+  datasets or environment files, reproduced **7 failed, 236 passed in 1.71s**.
+  Six `tests/test_demo.py` tests and the configured-backend test in
+  `tests/test_initial_pipeline.py` fail with `FileNotFoundError` for
+  `data/processed/evaluation/hotpotqa_evaluation.jsonl`.
+- Dependency gap: `src/ear_rag/data/normalization.py` imports `pyarrow.parquet`
+  eagerly, but requirements.txt does not declare pyarrow. The previously reported
+  missing-pyarrow failure is absent here because pyarrow is already installed.
+- Documentation review: README lacks fresh-environment/install/activation steps,
+  says pyarrow is undeclared, and lists a duplicate configs directory and absent
+  notebooks directory. Old progress sections incorrectly present Python 3.11,
+  missing ESA/recovery/routing and an old package shadow as current state.
+- Created `AGENT_HANDOFF.md` before implementation. Read the local error-logger
+  and agent-handoff skills and existing vault error notes; no EAR-RAG duplicates
+  exist. No new error notes yet because repairs have not been verified.
+- Repair sequence: dependency/package installation reliability, then
+  dataset-independent tests. Research calibration and experiments remain outside
+  this phase. Final verification and error-note results are recorded below.
+
+### Setup repair — implemented and verified
+
+- `requirements.txt`: declared pyarrow, already installed in the existing
+  environment; no version upgrades requested. `pyproject.toml`: added minimal
+  setuptools editable packaging, Python >=3.11 and src-only package discovery.
+  Dependency metadata reads requirements.txt rather than duplicating declarations.
+  `.gitignore`: ignore editable-install egg-info metadata.
+- `tests/test_project_setup.py`: removed its redundant global sys.path mutation,
+  assert the exact source-package origin, and added an isolated subprocess import
+  check from outside the repository, including data imports and config loading.
+- README updated in this same change: explicit installation/test/check commands,
+  Python/environment requirements, PowerShell activation template, pyarrow,
+  editable-checkout limitation, unverified demo behavior and corrected tree.
+  Installation and new commands were initially labelled pending, then updated
+  after the verification below.
+- Regression reproduced before installation: `-m pytest tests/test_project_setup.py
+  -q` returned **1 failed, 2 passed**, with isolated `ModuleNotFoundError`.
+- `.\ai-proj-new\Scripts\python.exe -m pip install -e .`: succeeded; existing
+  dependency versions were already satisfied. No installed dependencies upgraded.
+- `-m pytest tests/test_project_setup.py tests/test_dataset_normalization.py -q`:
+  **10 passed in 0.80s**. Direct import resolves to `C:\ear-rag\src\ear_rag\__init__.py`;
+  `-m ear_rag.demo --help` succeeded; `-m pip check` reported no broken requirements;
+  `git diff --check` passed. README pending labels were updated after verification.
+- The next repair addressed dependence on ignored local datasets; complete
+  environment verification is recorded in the final verification section.
+
+### Test isolation repair — implemented and verified
+
+- `tests/conftest.py`: added an opt-in fixture that generates 500 synthetic
+  normalized HotpotQA examples and separate evaluation labels in pytest's
+  temporary directory. Only the demo's data root is redirected; its real loader,
+  normalizer, backends and controller still execute. No local data is changed.
+- `tests/test_demo.py`: applied the fixture to all six tests; retained the
+  500-example and every control/cost assertion. Renamed the loader test to avoid
+  implying synthetic data is a real corpus. Added adversarial supervision fields
+  to inputs and strengthened label-isolation and support-resolution assertions.
+- `tests/test_initial_pipeline.py`: the configured-backend demo test uses the
+  same fixture; the routing assertion remains unchanged. No tests skipped.
+- README reviewed and updated in this same change to distinguish temporary test
+  inputs from the interactive demo's optional user-supplied corpus. Verification
+  was updated after focused verification: `.\ai-proj-new\Scripts\python.exe -m
+  pytest tests/test_demo.py tests/test_initial_pipeline.py -q`:
+  **23 passed in 0.63s**. Fresh-environment results are recorded below.
+
+### Documentation reconciliation and full workspace verification
+
+- Updated this document's old undated architecture, file inventory, dependencies,
+  datasets, experiments, limitations and next-phase sections to the inspected
+  current state. Explicitly marked the old Phase 1.4 status as historical.
+- Reviewed README again: marked its original phase list as an original roadmap;
+  recorded verified existing-environment activation and the complete suite result.
+- `.\ai-proj-new\Scripts\python.exe -m pytest -q`: **244 passed in 1.92s**;
+  `-m pip check`: **No broken requirements found**. Existing environment activation
+  `. .\ai-proj-new\Scripts\Activate.ps1` followed by `python -c "import sys,
+  ear_rag; print(sys.executable); print(ear_rag.__file__)"` selected the intended
+  interpreter and `src/ear_rag/__init__.py`.
+- Fresh-install check in a new source snapshot: `python -m venv .venv`,
+  `. .\.venv\Scripts\Activate.ps1`, and `python -m pip install -e .` succeeded.
+  This separate environment resolved pyarrow 26.0.0, mypy 2.4.0 and pre-commit
+  4.7.0 under the unchanged lower-bound specifications. Original installed
+  dependency versions remained unchanged. Full snapshot results follow below.
+
+### Final verification and stop point
+
+- Full original environment: **244 passed in 1.92s**, no failures or skips.
+  Full fresh source-only snapshot: **244 passed in 1.36s**, no failures or skips.
+  Baseline source-only export had **7 failed, 236 passed**; original populated
+  workspace had **243 passed**. The additional test guards isolated installation.
+- Fresh snapshot path:
+  `C:\Users\anant\AppData\Local\Temp\ear-rag-phase1-verified-ew3u0v0v\repo`.
+  Exported HEAD using `git archive --format=zip HEAD` and overlaid only changed
+  tracked files plus the three new deliverables. No ignored datasets/environment
+  were copied. Created/activated `.venv`, installed with `python -m pip install
+  -e .`, and ran `python -m pytest -q` and `python -m pip check` successfully.
+- `python -I -c "import ear_rag, ear_rag.data; from ear_rag.config import load_config;
+  from importlib.metadata import requires, version; print(ear_rag.__file__);
+  assert load_config()['project']['name'] == 'EAR-RAG'; print('pyarrow:',
+  version('pyarrow')); print('Declared:', requires('ear-rag'))"` succeeded in that
+  fresh environment. Metadata declares pyarrow; imports resolve to snapshot src.
+  `python -m ear_rag.demo --help` also succeeded without local datasets.
+- README and PROGRESS were updated after each logical repair and reviewed again
+  after final verification. No tests were skipped or weakened. `src/`,
+  `configs/config.yaml`, and `pytest.ini` are unchanged: all four backends, ESA
+  dimensions, single recovery bound, mandatory reassessment and abstention remain.
+- Obsidian live logging: created and read back three new notes (no duplicates):
+  `C:/Users/anant/MyObsidianVault/Errors/ear-rag-src-package-not-installed.md`,
+  `C:/Users/anant/MyObsidianVault/Errors/ear-rag-undeclared-pyarrow-dependency.md`,
+  `C:/Users/anant/MyObsidianVault/Errors/ear-rag-tests-depend-on-ignored-hotpotqa-files.md`.
+  The pyarrow note explicitly distinguishes the verified declaration defect from
+  the historical collection error that did not recur in the populated environment.
+- No remaining Phase 1 test/dependency/import blocker. Unverified/outside scope:
+  Python 3.11 execution, standalone wheel deployment, full interactive demo,
+  real-data commands and research evaluation. Ignored inaccessible temporary
+  directory remains untouched. Phase 2 requires explicit user approval.
+- Final `git diff --check` passed. Compared every changed packaging/dependency/
+  test file byte-for-byte with the tested fresh snapshot: all match. Confirmed
+  `git diff --name-only -- src configs pytest.ini` is empty.
+- Final working tree is intentionally uncommitted: modified `.gitignore`,
+  `PROGRESS.md`, `README.md`, `requirements.txt`, `tests/test_demo.py`,
+  `tests/test_initial_pipeline.py`, `tests/test_project_setup.py`; new
+  `AGENT_HANDOFF.md`, `pyproject.toml`, `tests/conftest.py`.
+
+### Verification command record
+
+Commands below were actually executed in C:\ear-rag unless otherwise stated.
+Baseline runs preceded repairs; focused checks preceded final suites.
+
+```powershell
+git rev-parse --show-toplevel
+git status --short --branch
+.\ai-proj-new\Scripts\python.exe -m pytest -q
+.\ai-proj-new\Scripts\python.exe -c "import ear_rag; print(ear_rag.__file__)"
+.\ai-proj-new\Scripts\python.exe -m pytest tests/test_project_setup.py -q
+.\ai-proj-new\Scripts\python.exe -m pip install -e .
+.\ai-proj-new\Scripts\python.exe -m pytest tests/test_project_setup.py tests/test_dataset_normalization.py -q
+.\ai-proj-new\Scripts\python.exe -m pytest tests/test_demo.py tests/test_initial_pipeline.py -q
+.\ai-proj-new\Scripts\python.exe -m pip check
+.\ai-proj-new\Scripts\python.exe -m ear_rag.demo --help
+. .\ai-proj-new\Scripts\Activate.ps1
+python -c "import sys, ear_rag; print(sys.executable); print(ear_rag.__file__)"
+git diff --name-only -- src configs pytest.ini
+git diff --check
+git diff --stat
+```
+
+In the fresh source snapshot, the exact setup/suite/check/help commands were:
+
+```powershell
+python -m venv .venv
+. .\.venv\Scripts\Activate.ps1
+python -c "import sys; print(sys.executable); print(sys.version)"
+python -m pip install -e .
+python -m pytest -q
+python -m pip check
+python -m ear_rag.demo --help
+```
+
 ## Query-analysis validation and evaluation (2026-10-09)
 
 - Preserved all 500 existing local HotpotQA routing decisions, features, scores,
@@ -218,7 +391,7 @@ Evaluate whether an evidence-aware adaptive retrieval policy can improve answer
 quality and reduce unsupported or hallucinated answers relative to fixed
 retrieval and adaptive-RAG baselines.
 
-## Current Status
+## Historical Phase 1.4 status (2026-08-23; superseded)
 
 **Phase 1.4 dataset and persistent retrieval pipeline: COMPLETED (2026-08-23).**
 
@@ -446,18 +619,20 @@ empty protected root-level `ear_rag` reparse-point directory remains in place.
 - `src/ear_rag/core/interfaces.py`: typed `Protocol` contracts only.
 - `src/ear_rag/config/loader.py`: lightweight YAML configuration loading and
   access helpers.
-- `src/ear_rag/retrieval/`: deterministic document chunking and local lexical
-  retrieval, with retrieval-cost metadata.
-- `src/ear_rag/data/`: normalized local dataset adapters, preprocessing,
-  deterministic artifact persistence, and persisted-index reload support.
-- `configs/config.yaml`: initial project, path, query-analysis, retrieval, ESA,
-  recovery, generation, evaluation, and logging settings.
-- `tests/`: foundation smoke tests for imports, models, interfaces, and
-  configuration.
-
-The named directories for baselines, data, evaluation, evidence, generation,
-retrieval, routing, and utilities exist under `src/ear_rag`, but currently have
-no implementation files.
+- `src/ear_rag/retrieval/`: chunking, lexical/BM25-style, hashed Vector Flat,
+  score-fusion Hybrid and bounded Multi-hop retrieval, with cost metadata.
+- `src/ear_rag/data/`: local adapters, schema normalization (including Parquet),
+  preprocessing, separate corpus/evaluation artifacts and persisted-index reload.
+- `src/ear_rag/evidence/`: deterministic relevance, coverage, support and
+  consistency assessment. `routing/`: heuristic initial routing, provisional
+  cost-aware recovery selection and bounded retrieval control.
+- `demo.py`: existing retrieval/controller CLI; no generated answers.
+  `evaluate_initial.py` and `evaluation_*.py`: existing offline evaluation tools;
+  no research evaluation run during this reliability phase.
+- `configs/config.yaml`: tracked runtime defaults. Recovery is capped at one
+  round, must reassess ESA after recovery and abstains on remaining insufficiency.
+- `tests/`: contracts, local data/retrieval/control/routing/evaluation checks and
+  isolated package imports; demo tests use temporary synthetic normalized inputs.
 
 ## Current File Structure
 
@@ -466,22 +641,25 @@ src/ear_rag/
   __init__.py
   config/{__init__.py, loader.py}
   core/{__init__.py, models.py, interfaces.py}
-  data/{__init__.py, datasets.py, preprocessing.py, persistence.py, pipeline.py}
-  retrieval/{__init__.py, chunking.py, local.py}
-  {baselines,data,evaluation,evidence,generation,routing,utils}/
+  data/{__init__.py, datasets.py, preprocessing.py, persistence.py, pipeline.py, normalization.py}
+  retrieval/{__init__.py, chunking.py, local.py, vector.py, hybrid.py, multihop.py}
+  evidence/{__init__.py, esa.py}
+  routing/{__init__.py, query_analysis.py, initial.py, cost_awareness.py, recovery.py, pipeline.py}
+  demo.py, evaluate_initial.py, evaluation_metrics.py, evaluation_report.py, evaluation_artifacts.py
 configs/config.yaml
-tests/{test_config.py,test_contract_hardening.py,test_core_models.py,test_interfaces.py,test_local_retrieval.py,test_project_setup.py}
+tests/{conftest.py, test_*.py}
+pyproject.toml, requirements.txt, pytest.ini, README.md, PROGRESS.md, AGENT_HANDOFF.md
 data/{raw,processed,indexes,fixtures}/
-outputs/{logs,results,demos}/
+outputs/  # ignored generated artifacts
 ```
 
 ## Dependencies
 
-- Python 3.11.9 virtual environment.
-- Installed: `pytest==9.1.1`, `PyYAML==6.0.3` and their small runtime
-  dependencies.
-- Declared but not installed in the existing environment: `mypy`, `pre-commit`.
-- No large ML dependencies are installed.
+- Python >=3.11 is required by StrEnum/Self; actual verification uses 3.12.4.
+- Existing environment `ai-proj-new`: pytest 9.1.1, PyYAML 6.0.3, pyarrow 25.0.1,
+  mypy 2.3.1 and pre-commit 4.6.2, all declared. Installed editable ear-rag 0.1.0.
+- `requirements.txt` remains the single dependency source, read by pyproject.toml.
+  No existing dependency versions were upgraded; no model frameworks were added.
 
 ## Models
 
@@ -489,24 +667,31 @@ No models selected, configured beyond placeholder strings, or downloaded.
 
 ## Datasets
 
-The local deterministic fixture is configured for development. Natural Questions,
-HotpotQA, and 2WikiMultihopQA are supported through a normalized local JSONL
-adapter contract only; none of their source datasets have been downloaded.
+Tracked deterministic fixtures support tests without external datasets. This
+workspace already contains ignored raw/processed datasets from earlier phases;
+the interactive demo needs these local normalized artifacts, which fresh clones
+do not contain. No dataset/model downloads or preparation occurred in this phase.
+NQ-Open still requires a separately supplied external retrieval corpus.
 
 ## Experiments
 
-No experiments have been run.
+Historical local development evaluations are documented in the 2026-10-09 entries
+and linked reports. They do not establish independent research improvement.
+No evaluation or calibration experiments were started during reliability Phase 1.
 
 ## Known Issues
 
-- `src/ear_gr/` contains only a generated `__pycache__`, and the empty
-  `src/ear_rag/config/_/` and `src/ear_rag/core/_/` directories remain because
-  the environment blocked their deletion. They contain no active source code and
-  do not affect package imports or tests.
-- The requirement file lists development tools not present in `.venv`.
-- Natural Questions, HotpotQA, and 2WikiMultihopQA still require user-supplied,
-  locally normalized JSONL files; no native source-format parser exists yet.
+- Python 3.11 and standalone wheel deployment are not tested in this phase.
+  Editable installation retains repository-relative config/fixture paths.
+- Full interactive demo behavior and real-dataset commands are outside scope.
+- The ignored `pytest_phase_16c_tmp/` directory denies enumeration; it is outside
+  configured testpaths and was left untouched. No root package shadow exists now.
+- Heuristic routing, ESA and cost estimates remain uncalibrated prototypes;
+  generation, independent baselines and research claims are not completed.
 
 ## Next Phase
 
-Phase 1.5 — Lightweight Evidence Sufficiency Assessment and 40% Research Demonstrator.
+Reliability Phase 2 requires the user's explicit review and approval. Proposed
+scope: separately review remaining demo/data prerequisites and define the next
+controlled validation task. Do not automatically prepare datasets, calibrate
+estimators, change routing policy or start research evaluation.

@@ -57,26 +57,62 @@ fallback causes, evidence-label coverage, decision regret, paired comparisons an
 JSON/CSV reports. It preserves the existing routing policy and documents where
 its features and prototype backends fail.
 
-## Run and validate
+## Setup and validate
 
-From this repository's root in PowerShell, using its existing virtual environment:
+Python 3.11+ is required (`StrEnum` and `typing.Self`); this phase was verified
+on Python 3.12.4. The existing environment is `ai-proj-new`, not `.venv`.
+From `C:\ear-rag` in Windows PowerShell:
 
 ```powershell
-$env:PYTHONPATH = "$PWD\src"
-.\ai-proj-new\Scripts\python.exe -m ear_rag.demo
-.\ai-proj-new\Scripts\python.exe -B -m pytest -q -p no:cacheprovider
-.\ai-proj-new\Scripts\python.exe -B -m ear_rag.evaluate_initial --smoke --examples 5
-.\ai-proj-new\Scripts\python.exe -B -m ear_rag.evaluate_initial --dataset hotpotqa --examples 20
+.\ai-proj-new\Scripts\python.exe -m pip install -e .
+.\ai-proj-new\Scripts\python.exe -m pytest -q
+.\ai-proj-new\Scripts\python.exe -m pip check
 ```
 
-The offline evaluation compares available fixed strategies with query-aware
-routing using a common corpus and **recovery disabled in every condition**. It
-reports supporting-document recall@k, routing distribution/fallback, router and
-retrieval latency, underlying retrieval calls, passages, and final context size.
-The synthetic smoke fixture is tracked; real evaluation requires local normalized
-datasets under `data/processed`. PyYAML and pytest are listed in `requirements.txt`;
-dataset preprocessing tests also require `pyarrow`, installed in the existing
-environment but not yet listed there. No new model downloads are required.
+The editable installation uses `requirements.txt` as its single dependency source,
+including existing development tools and the required `pyarrow` Parquet reader.
+It makes `ear_rag` importable without setting `PYTHONPATH`. This is a development
+checkout installation: keep `src/`, `configs/`, and tracked fixtures together;
+standalone wheel deployment is not verified. Editable installation, isolated
+imports/config loading, and Parquet normalization tests passed on Python 3.12.4;
+see [PROGRESS.md](PROGRESS.md) for results and remaining work.
+
+For a fresh checkout, create a virtual environment first, then install the package.
+This creation/activation/install sequence was verified in a temporary source-only
+snapshot with no local datasets and a fresh Python 3.12.4 environment:
+
+```powershell
+python -m venv .venv
+. .\.venv\Scripts\Activate.ps1
+python -m pip install -e .
+python -m pytest -q
+python -m pip check
+```
+
+Verified activation of the existing environment uses
+`. .\ai-proj-new\Scripts\Activate.ps1`. Explicit interpreter commands above also
+work without activation or changes to PowerShell execution policy.
+
+Verified package/CLI smoke checks:
+
+```powershell
+.\ai-proj-new\Scripts\python.exe -c "import ear_rag; print(ear_rag.__file__)"
+.\ai-proj-new\Scripts\python.exe -m ear_rag.demo --help
+```
+
+Running the interactive demo (`python -m ear_rag.demo`) additionally requires
+local normalized HotpotQA files in `data/processed/`; those files are ignored by
+Git and absent from a fresh clone. Automated demo tests instead generate temporary
+synthetic inputs and exercise the real loader, retrievers and controller. No
+external datasets are needed by the test suite. Both the existing environment and
+the fresh installation passed **244 tests**, with no skips. Full interactive demo
+behavior, Python 3.11 execution and standalone wheel deployment were not verified
+in this phase. No datasets or models were downloaded.
+
+The existing offline evaluator compares fixed strategies with query-aware routing
+with recovery disabled. Its tracked synthetic fixture and historical reports are
+documented in [the routing guide](docs/initial_routing.md). Evaluation commands
+and new research experiments are outside this reliability phase.
 
 The initial 20-question HotpotQA development check did not establish improvement:
 routed local-support recall@5 was 75%, versus fixed lexical 87.5%, among 16 queries
@@ -86,18 +122,19 @@ coverage caveats are in the [evaluation report](docs/initial_routing.md#measured
 
 ## Repository Structure
 ```
-ear-research/
+ear-rag/
 ├── src/ear_rag/          # Python package
 ├── configs/              # Configuration files
 ├── data/                 # Raw and processed data
 ├── tests/                # Test suite
 ├── outputs/              # Logs and results
-├── configs/              # Configuration files
-├── notebooks/            # Jupyter notebooks
 └── docs/                 # Documentation
 ```
 
-## Implementation Phases
+## Original Implementation Roadmap
+
+These were the original phase labels; current implemented and verified status is
+summarized above and recorded in [PROGRESS.md](PROGRESS.md).
 - **Phase 1.1**: Project foundation ✓
 - **Phase 1.2**: Configuration and Core Interfaces
 - **Phase 2.x**: RAG pipeline implementation
@@ -107,4 +144,5 @@ ear-research/
 
 Consult [PROGRESS.md](PROGRESS.md) for phase history. Current routing and ESA are
 deterministic baselines, not learned or calibrated policies; generation and
-dataset-scale research evaluation remain future work.
+independent dataset-scale research validation remain future work. The existing
+local development evaluations do not establish a research improvement.

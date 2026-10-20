@@ -150,7 +150,7 @@ def test_real_pipeline_esa_wiring_with_synthetic_fixture():
     assert result.initial_assessment == DeterministicEvidenceAssessor().assess(result.query, result.initial_retrieval)
 
 
-def test_main_demo_honors_disabled_configured_backend():
+def test_main_demo_honors_disabled_configured_backend(demo_dataset_root):
     runner = DemoRunner()
     runner.config["query_analysis"]["enabled"] = False
     runner.config["retrieval"]["backend"] = "vector_flat"

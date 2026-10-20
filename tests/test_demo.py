@@ -1,12 +1,20 @@
 """Focused tests for the Phase 1.6C controlled demonstration."""
+import pytest
+
 from ear_rag.demo import DemoRunner, build_backends, load_demo_dataset, main
 
+pytestmark = pytest.mark.usefixtures("demo_dataset_root")
 
-def test_demo_loads_real_hotpotqa_and_keeps_documents_retriever_safe():
+
+def test_demo_loads_normalized_hotpotqa_and_keeps_documents_retriever_safe():
     examples = load_demo_dataset("hotpotqa")
     assert len(examples) == 500 and examples[0].documents
     forbidden = {"answer", "answers", "supporting_facts", "evidences", "support_sentence_ids"}
     assert not forbidden.intersection(examples[0].documents[0].metadata)
+    assert all(not forbidden.intersection(document.metadata)
+               for example in examples for document in example.documents)
+    assert examples[0].supporting_document_ids == frozenset({"hotpotqa:synthetic-0:0"})
+    assert "evaluation-only-marker" not in repr(examples)
 
 
 def test_comparison_runs_all_existing_strategies_and_reports_cost():
