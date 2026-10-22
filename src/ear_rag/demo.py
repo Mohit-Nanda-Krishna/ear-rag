@@ -154,7 +154,7 @@ class DemoRunner:
             sufficient_threshold=float(assessment_config["sufficient_threshold"]),
             uncertain_threshold=float(assessment_config["uncertain_threshold"]), weights=assessment_config["weights"],
         )
-        policy = BoundedRecoveryPolicy(max_recovery_rounds=int(recovery_config["max_recovery_rounds"]), recovery_backends=recovery_config["recovery_backends"], max_retrieved_chunks=int(recovery_config["max_retrieved_chunks"]), cost_awareness=recovery_config["cost_awareness"])
+        policy = BoundedRecoveryPolicy(max_recovery_rounds=int(recovery_config["max_recovery_rounds"]), recovery_backends=recovery_config["recovery_backends"], max_retrieved_chunks=int(recovery_config["max_retrieved_chunks"]), cost_awareness=recovery_config["cost_awareness"], multihop_max_hops=int(self.config["multihop"]["max_hops"]))
         query = self._query(index) if query_text is None else Query(example.example_id, query_text, {"dataset": self.dataset})
         result = RetrievalControlPipeline(
             self._fresh_backends(), assessor, policy, top_k=self._top_k(),
@@ -209,7 +209,9 @@ def _print_controller(runner: DemoRunner, index: int, output: Callable[[str], No
     decision = result.recovery_decision.metadata
     output(f"\nSTEP 2 - ESA\nCurrent ESA                  : {result.initial_assessment.overall_score:.3f}\nDecision                     : {result.initial_assessment.decision.upper()}")
     if "candidate_backend" in decision:
-        output(f"\nSTEP 3 - COST-AWARE DECISION\nCandidate recovery           : {decision['candidate_backend']}\nEstimated ESA after recovery : {decision['estimated_esa_after']:.3f}\nExpected evidence gain       : {decision['expected_evidence_gain']:.3f}\nExpected additional cost     : {decision['expected_additional_cost']:.3f}\nExpected cost efficiency     : {decision['expected_cost_efficiency']:.3f}\nCost-efficiency threshold    : {decision['cost_efficiency_threshold']:.3f}\nDecision                     : {'RECOVERY WORTHWHILE' if decision.get('recover') else 'RECOVERY NOT WORTHWHILE'}")
+        output(f"\nSTEP 3 - COST-AWARE DECISION\nCandidate recovery           : {decision['candidate_backend']}\nObserved ESA deficiency      : {decision['evidence_deficiency']:.3f}\nDeterministic suitability    : {decision['suitability']:.3f}\nSuitability reason           : {decision['suitability_reason']}\nEstimated incremental cost  : {decision['incremental_cost']:.3f}\nCAS                          : {decision['cas']:.3f}\nCAS threshold (strict >)     : {decision['cas_threshold']:.3f}\nDecision                     : {'RECOVERY WORTHWHILE' if decision.get('recover') else 'RECOVERY NOT WORTHWHILE'}")
+    elif decision.get("candidate_evaluations"):
+        output(f"\nSTEP 3 - COST-AWARE DECISION\n{result.recovery_decision.reason}")
     if result.recovery_retrieval and result.recovery_assessment:
         output(f"\nSTEP 4 - RECOVERY\nRecovery performed           : YES\nRecovery round               : 1 / 1\nStrategy                     : {result.recovery_retrieval.retriever_name}")
         output(f"\nSTEP 5 - SECOND ESA\nFinal ESA                    : {result.recovery_assessment.overall_score:.3f}\nDecision                     : {result.recovery_assessment.decision.upper()}")
@@ -225,7 +227,11 @@ def _print_evidence(results: list[RetrievalResult], output: Callable[[str], None
     for result in results:
         output(f"\n{'=' * 63}\nRETRIEVED EVIDENCE: {result.retriever_name}\n{'=' * 63}")
         for rank, chunk in enumerate(result.chunks, 1):
-            output(f"\nRank {rank}\nTitle       : {chunk.metadata.get('title', '(untitled)')}\nDocument ID : {chunk.document_id}\nRetriever   : {chunk.retriever_name}\nScore       : {chunk.retrieval_score:.4f}\nRetrieved text:\n{chunk.text}")
+            title = chunk.metadata.get("title")
+            document_metadata = chunk.metadata.get("document_metadata", {})
+            if title is None and isinstance(document_metadata, Mapping):
+                title = document_metadata.get("title")
+            output(f"\nRank {rank}\nTitle       : {title or '(untitled)'}\nDocument ID : {chunk.document_id}\nRetriever   : {chunk.retriever_name}\nScore       : {chunk.retrieval_score:.4f}\nRetrieved text:\n{chunk.text}")
 
 
 def _print_evaluation(runner: DemoRunner, count: int, output: Callable[[str], None] = print) -> None:

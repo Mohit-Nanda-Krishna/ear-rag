@@ -1,0 +1,987 @@
+{
+  "counts": {
+    "excluded": 50,
+    "otherwise_invalid": 0,
+    "total_records_inspected": 7405,
+    "unclassifiable": 0,
+    "valid": 7355
+  },
+  "definitions": {
+    "excluded": "Reliably identified, structurally classifiable record with at least one policy exclusion finding.",
+    "excluded_reason_counts": "Excluded records per code, once per code per record; overlapping codes are not additive.",
+    "otherwise_invalid": "All remaining invalid or unclassifiable records; disjoint from valid and excluded.",
+    "unclassifiable": "Subset of otherwise_invalid with ambiguous identity or incomplete policy checks; not additive.",
+    "valid": "Passes existing strict per-record validation and unique usable ID checks; not evaluation approval."
+  },
+  "evaluation_approval": "not_granted",
+  "excluded_reason_counts": {
+    "blank_candidate_sentence": 49,
+    "support_sentence_index_out_of_range": 1
+  },
+  "excluded_records": [
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 8,
+          "sentence_index": 10,
+          "sentence_value": "",
+          "title": "1989 Houston Oilers season"
+        }
+      ],
+      "question_id": "5a7320565542991f9a20c61d",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 57,
+      "strict_validation_error": "context[8] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 9,
+          "sentence_index": 3,
+          "sentence_value": "",
+          "title": "Gulfstream Natural Gas Pipeline"
+        }
+      ],
+      "question_id": "5abbd3ac55429931dba1458b",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 318,
+      "strict_validation_error": "context[9] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 7,
+          "sentence_index": 5,
+          "sentence_value": "",
+          "title": "Pandanus conoideus"
+        }
+      ],
+      "question_id": "5a72c6f65542994cef4bc402",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 348,
+      "strict_validation_error": "context[7] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 3,
+          "sentence_index": 3,
+          "sentence_value": "",
+          "title": "Tiwest Joint Venture"
+        }
+      ],
+      "question_id": "5ac240ef55429951e9e684ef",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 670,
+      "strict_validation_error": "context[3] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 1,
+          "sentence_index": 2,
+          "sentence_value": "",
+          "title": "Orphans (1987 film)"
+        }
+      ],
+      "question_id": "5a822a5e55429926c1cdae43",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 766,
+      "strict_validation_error": "context[1] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 6,
+          "sentence_index": 13,
+          "sentence_value": "",
+          "title": "Padosan"
+        }
+      ],
+      "question_id": "5a8db916554299441c6ba057",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 780,
+      "strict_validation_error": "context[6] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 8,
+          "sentence_index": 6,
+          "sentence_value": "",
+          "title": "Robin Chase"
+        }
+      ],
+      "question_id": "5a86fde6554299211dda2b7f",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 796,
+      "strict_validation_error": "context[8] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 2,
+          "sentence_index": 1,
+          "sentence_value": " ",
+          "title": "Robert M. Fomon"
+        }
+      ],
+      "question_id": "5a8f812755429918e830d245",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 894,
+      "strict_validation_error": "context[2] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 2,
+          "sentence_index": 5,
+          "sentence_value": "",
+          "title": "Rockland, Maine"
+        }
+      ],
+      "question_id": "5ae5c8cf554299546bf82f5f",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 1204,
+      "strict_validation_error": "context[2] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 2,
+          "sentence_index": 3,
+          "sentence_value": "",
+          "title": "Egypt Lake Partnership Library"
+        }
+      ],
+      "question_id": "5adce2ee5542992c1e3a2461",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 1294,
+      "strict_validation_error": "context[2] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 1,
+          "sentence_index": 9,
+          "sentence_value": "",
+          "title": "The Nurtured Heart Approach"
+        }
+      ],
+      "question_id": "5a835c895542993344746009",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 1607,
+      "strict_validation_error": "context[1] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 9,
+          "sentence_index": 5,
+          "sentence_value": "",
+          "title": "Eulalie Spence"
+        }
+      ],
+      "question_id": "5ade00855542997dc7907118",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 1955,
+      "strict_validation_error": "context[9] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 5,
+          "sentence_index": 4,
+          "sentence_value": " ",
+          "title": "Kravitz Design"
+        }
+      ],
+      "question_id": "5ab56e085542992aa134a315",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 1966,
+      "strict_validation_error": "context[5] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 2,
+          "sentence_index": 8,
+          "sentence_value": "",
+          "title": "Give My Regards to Davy"
+        }
+      ],
+      "question_id": "5a7be1ab5542997c3ec972a9",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 2005,
+      "strict_validation_error": "context[2] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 9,
+          "sentence_index": 6,
+          "sentence_value": "",
+          "title": "Color scroller"
+        }
+      ],
+      "question_id": "5a73d951554299623ed4ac77",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 2027,
+      "strict_validation_error": "context[9] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 1,
+          "sentence_index": 4,
+          "sentence_value": " ",
+          "title": "Time Bomb High School"
+        }
+      ],
+      "question_id": "5a75f0bf5542994ccc91866b",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 2098,
+      "strict_validation_error": "context[1] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 9,
+          "sentence_index": 1,
+          "sentence_value": " ",
+          "title": "The Hilltop (newspaper)"
+        }
+      ],
+      "question_id": "5abe18e055429976d4830a74",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 2125,
+      "strict_validation_error": "context[9] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 1,
+          "sentence_index": 4,
+          "sentence_value": "",
+          "title": "Famous Smoke Shop"
+        }
+      ],
+      "question_id": "5a7fac0055429969796c1b1b",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 2126,
+      "strict_validation_error": "context[1] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 1,
+          "sentence_index": 9,
+          "sentence_value": "",
+          "title": "As Cruel as School Children"
+        }
+      ],
+      "question_id": "5a8ab6be5542992d82986f5f",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 2342,
+      "strict_validation_error": "context[1] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 5,
+          "sentence_index": 4,
+          "sentence_value": "",
+          "title": "Bombing of Bremen in World War II"
+        }
+      ],
+      "question_id": "5a8b2a0355429971feec465b",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 2510,
+      "strict_validation_error": "context[5] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 3,
+          "sentence_index": 3,
+          "sentence_value": " ",
+          "title": "The Crawling Distance"
+        }
+      ],
+      "question_id": "5ae0c9dd5542993d6555ec69",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 2628,
+      "strict_validation_error": "context[3] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 3,
+          "sentence_index": 13,
+          "sentence_value": "",
+          "title": "Padosan"
+        }
+      ],
+      "question_id": "5ab4789e5542990594ba9c29",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 2773,
+      "strict_validation_error": "context[3] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 3,
+          "sentence_index": 3,
+          "sentence_value": " ",
+          "title": "Martin Boonzaayer"
+        }
+      ],
+      "question_id": "5a7148685542994082a3e761",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 2864,
+      "strict_validation_error": "context[3] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 4,
+          "sentence_index": 5,
+          "sentence_value": "",
+          "title": "Ripon Cathedral"
+        }
+      ],
+      "question_id": "5ac17b485542994ab5c67d65",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 2943,
+      "strict_validation_error": "context[4] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 9,
+          "sentence_index": 4,
+          "sentence_value": "",
+          "title": "Tyler Asemota"
+        }
+      ],
+      "question_id": "5a8a09565542992d82986e66",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 2946,
+      "strict_validation_error": "context[9] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 9,
+          "sentence_index": 5,
+          "sentence_value": "",
+          "title": "Redl-Zipf"
+        }
+      ],
+      "question_id": "5ab8ee805542991b5579f051",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 3165,
+      "strict_validation_error": "context[9] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 4,
+          "sentence_index": 3,
+          "sentence_value": "",
+          "title": "Colorado's 4th congressional district"
+        }
+      ],
+      "question_id": "5a8b4d5e5542995d1e6f135c",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 3254,
+      "strict_validation_error": "context[4] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 2,
+          "sentence_index": 5,
+          "sentence_value": "  ",
+          "title": "Diana Lemieux"
+        }
+      ],
+      "question_id": "5ac160bb5542994d76dccdfb",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 3307,
+      "strict_validation_error": "context[2] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 0,
+          "sentence_index": 4,
+          "sentence_value": "",
+          "title": "UFC Fight Night 6"
+        }
+      ],
+      "question_id": "5ae625935542995703ce8b2a",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 3479,
+      "strict_validation_error": "context[0] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 8,
+          "sentence_index": 4,
+          "sentence_value": "",
+          "title": "UFC Fight Night 6"
+        }
+      ],
+      "question_id": "5ae629215542995703ce8b34",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 3556,
+      "strict_validation_error": "context[8] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 7,
+          "sentence_index": 8,
+          "sentence_value": "",
+          "title": "Ready (2011 film)"
+        }
+      ],
+      "question_id": "5a77e9c055429949eeb29fa6",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 3617,
+      "strict_validation_error": "context[7] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 6,
+          "sentence_index": 7,
+          "sentence_value": "",
+          "title": "Voted Most Random"
+        }
+      ],
+      "question_id": "5ab5d2fe554299488d4d9a3e",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 3833,
+      "strict_validation_error": "context[6] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 3,
+          "sentence_index": 4,
+          "sentence_value": " ",
+          "title": "Burns Park (Detroit, Michigan)"
+        }
+      ],
+      "question_id": "5ac0223f5542992a796dec9f",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 3935,
+      "strict_validation_error": "context[3] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 1,
+          "sentence_index": 6,
+          "sentence_value": "",
+          "title": "2000–01 Georgetown Hoyas men's basketball team"
+        }
+      ],
+      "question_id": "5abd93115542996e802b47e0",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 4091,
+      "strict_validation_error": "context[1] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 4,
+          "sentence_index": 5,
+          "sentence_value": "",
+          "title": "McMillan Woods CCC camp"
+        }
+      ],
+      "question_id": "5ab9d02155429970cfb8ebb0",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 4844,
+      "strict_validation_error": "context[4] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 0,
+          "sentence_index": 3,
+          "sentence_value": "  ",
+          "title": "Party for the Government of the People"
+        }
+      ],
+      "question_id": "5ab6ecd85542991d322236cf",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 4986,
+      "strict_validation_error": "context[0] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "support_sentence_index_out_of_range",
+          "sentence_count": 5,
+          "sentence_index": 902,
+          "supporting_fact_position": 3,
+          "title": "Jimmy Butler (basketball)",
+          "valid_max": 4,
+          "valid_min": 0
+        }
+      ],
+      "question_id": "5ae61bfd5542992663a4f261",
+      "reason_codes": [
+        "support_sentence_index_out_of_range"
+      ],
+      "source_position": 5059,
+      "strict_validation_error": "supporting_facts[3] sentence index is invalid or out of range"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 2,
+          "sentence_index": 1,
+          "sentence_value": " ",
+          "title": "Steve Varsano"
+        }
+      ],
+      "question_id": "5a7b1bb5554299042af8f6d4",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 5077,
+      "strict_validation_error": "context[2] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 9,
+          "sentence_index": 2,
+          "sentence_value": "",
+          "title": "Alexandra McTavish"
+        }
+      ],
+      "question_id": "5abbd66a5542993f40c73bd8",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 5214,
+      "strict_validation_error": "context[9] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 1,
+          "sentence_index": 5,
+          "sentence_value": " ",
+          "title": "Fritztown, Pennsylvania"
+        }
+      ],
+      "question_id": "5a8a1a975542992e4fca8505",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 5409,
+      "strict_validation_error": "context[1] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 7,
+          "sentence_index": 5,
+          "sentence_value": " ",
+          "title": "70 Volt Parade"
+        }
+      ],
+      "question_id": "5ab85e195542992aa3b8c8c5",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 5676,
+      "strict_validation_error": "context[7] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 3,
+          "sentence_index": 5,
+          "sentence_value": " ",
+          "title": "The Story of Lucy Gault"
+        }
+      ],
+      "question_id": "5a72e4375542992359bc31bf",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 5684,
+      "strict_validation_error": "context[3] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 2,
+          "sentence_index": 6,
+          "sentence_value": " ",
+          "title": "Albert Joe Demby"
+        }
+      ],
+      "question_id": "5a732ca45542992359bc325d",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 6456,
+      "strict_validation_error": "context[2] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 1,
+          "sentence_index": 6,
+          "sentence_value": "",
+          "title": "Robin Chase"
+        }
+      ],
+      "question_id": "5ac0b1835542992a796ded65",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 6464,
+      "strict_validation_error": "context[1] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 8,
+          "sentence_index": 5,
+          "sentence_value": "",
+          "title": "Norman Gilliland"
+        }
+      ],
+      "question_id": "5a863114554299211dda2aa5",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 6549,
+      "strict_validation_error": "context[8] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 1,
+          "sentence_index": 2,
+          "sentence_value": "",
+          "title": "Miles Fitzalan-Howard, 17th Duke of Norfolk"
+        }
+      ],
+      "question_id": "5a8c8828554299653c1aa0ae",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 6698,
+      "strict_validation_error": "context[1] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 2,
+          "sentence_index": 2,
+          "sentence_value": "",
+          "title": "Miles Bell"
+        }
+      ],
+      "question_id": "5ae328df55429928c423963c",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 6828,
+      "strict_validation_error": "context[2] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 2,
+          "sentence_index": 2,
+          "sentence_value": "",
+          "title": "Compañía Nacional de Subsistencias Populares"
+        }
+      ],
+      "question_id": "5a7effeb5542994959419aa0",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 6858,
+      "strict_validation_error": "context[2] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 1,
+          "sentence_index": 7,
+          "sentence_value": "",
+          "title": "Edward M. Brownlee"
+        }
+      ],
+      "question_id": "5a7570a65542996c70cfaefd",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 7133,
+      "strict_validation_error": "context[1] sentence must be a nonempty string"
+    },
+    {
+      "classification": "excluded",
+      "classification_reliable": true,
+      "details": [
+        {
+          "code": "blank_candidate_sentence",
+          "context_position": 6,
+          "sentence_index": 2,
+          "sentence_value": "",
+          "title": "Joe Frazier's Gym"
+        }
+      ],
+      "question_id": "5ab915ad55429919ba4e239c",
+      "reason_codes": [
+        "blank_candidate_sentence"
+      ],
+      "source_position": 7187,
+      "strict_validation_error": "context[6] sentence must be a nonempty string"
+    }
+  ],
+  "file_error": null,
+  "otherwise_invalid_records": [],
+  "policy_version": "hotpotqa_initial_release_invalid_records_v1",
+  "schema_version": "hotpotqa_policy_audit_v1",
+  "source": {
+    "filename": "hotpot_dev_distractor_v1.json",
+    "format": "hotpotqa_json_array_v1",
+    "sha256": "4e9ecb5c8d3b719f624d66b60f8d56bf227f03914f5f0753d6fa1b359d7104ea",
+    "size_bytes": 46320117
+  },
+  "status": "inspected",
+  "unclassifiable_positions": []
+}

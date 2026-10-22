@@ -51,18 +51,15 @@ class LabelResolution:
                 "fully_resolved": self.complete, "unresolved_titles": list(self.unresolved_titles)}
 
 
-def retrieval_metrics(result: RetrievalResult, labels: LabelResolution, top_k: int,
-                      *, routing_ms: float = 0.0) -> dict[str, Any]:
+def supporting_document_metrics(result: RetrievalResult, labels: LabelResolution,
+                                top_k: int) -> dict[str, Any]:
+    """Pure document overlap metrics, independent of runtime cost availability."""
     if top_k < 1:
         raise ValueError("metric cutoff must be positive")
-    calls = underlying_calls(result)
-    if calls < 1:
-        raise ValueError("observed retrieval_calls must be positive for efficiency evaluation")
     chunks = result.chunks[:top_k]
     found = {chunk.document_id for chunk in chunks}
     matched = found & labels.resolved_ids
     recall = len(matched) / len(labels.resolved_ids) if labels.resolved_ids else None
-    latency = finite_number(result.metadata.get("retrieval_latency_ms", 0), "retrieval_latency_ms", nonnegative=True)
     return {
         "resolved_support_recall_at_k": recall,
         "hit_at_k": bool(matched) if labels.resolved_ids else None,
@@ -71,6 +68,20 @@ def retrieval_metrics(result: RetrievalResult, labels: LabelResolution, top_k: i
         "full_support_covered": recall == 1 if labels.complete else None,
         "matched_support_count": len(matched), "matched_support_ids": sorted(matched),
         "retrieved_document_ids": sorted(found), "retrieved_chunk_ids": [chunk.chunk_id for chunk in chunks],
+    }
+
+
+def retrieval_metrics(result: RetrievalResult, labels: LabelResolution, top_k: int,
+                      *, routing_ms: float = 0.0) -> dict[str, Any]:
+    metrics = supporting_document_metrics(result, labels, top_k)
+    calls = underlying_calls(result)
+    if calls < 1:
+        raise ValueError("observed retrieval_calls must be positive for efficiency evaluation")
+    recall = metrics["resolved_support_recall_at_k"]
+    chunks = result.chunks[:top_k]
+    latency = finite_number(result.metadata.get("retrieval_latency_ms", 0), "retrieval_latency_ms", nonnegative=True)
+    return {
+        **metrics,
         "utility": recall / calls if recall is not None else None,
         "underlying_retrieval_calls": calls, "retrieval_latency_ms": latency,
         "router_latency_ms": routing_ms, "initial_stage_latency_ms": routing_ms + latency,

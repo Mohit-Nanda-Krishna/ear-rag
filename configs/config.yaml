@@ -64,18 +64,18 @@ recovery:
   max_attempts: 1
   max_retrieved_chunks: 20
   recovery_backends:
-    local_lexical: vector_flat
-    vector_flat: hybrid
-    default: hybrid
+    # Candidate allow-list; CAS ranks executable, suitable, unattempted actions.
+    default: [local_lexical, vector_flat, hybrid, multihop]
   cost_awareness:
-    # Initial development-set-style deterministic estimates, not calibrated claims.
+    policy: evidence_sufficiency_cas_v1
+    # Strict CAS > threshold; engineering operating value, not calibrated.
     cost_efficiency_threshold: 1.0
-    estimated_esa_gain:
-      default: 0.25
-      vector_flat: 0.25
-      hybrid: 0.30
-    expected_work:
-      default:
+    # Nominal NEXT-action work, not future ESA/quality predictions. Chunks mean
+    # final returned context chunks (not child passages or processed chunks).
+    # Latency constants are assumptions, not measurements or a latency model.
+    # Cost=max(.05*calls+.01*chunks+.001*latency_ms,.05), abstract work units.
+    incremental_work:
+      local_lexical:
         retrieval_calls: 1
         retrieved_chunks: 5
         latency_ms: 10
@@ -87,10 +87,11 @@ recovery:
         retrieval_calls: 2
         retrieved_chunks: 5
         latency_ms: 20
-    cost_weights:
-      retrieval_calls: 0.05
-      retrieved_chunks: 0.01
-      latency_ms: 0.001
+      multihop:
+        # Reserved call budget = configured max_hops; execution can stop early.
+        retrieval_calls: 2
+        retrieved_chunks: 5
+        latency_ms: 20
 
 generation:
   enabled: false

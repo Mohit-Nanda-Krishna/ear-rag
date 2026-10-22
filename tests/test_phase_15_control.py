@@ -43,7 +43,9 @@ def test_recovery_runs_once_then_second_esa_terminates():
     backends = _backends(); assessor = DeterministicEvidenceAssessor(sufficient_threshold=.99, uncertain_threshold=.5)
     policy = BoundedRecoveryPolicy(max_recovery_rounds=1, recovery_backends={"local_lexical": "vector_flat"})
     pipeline = RetrievalControlPipeline(backends, assessor, policy, top_k=2)
-    result = pipeline.run(Query("q", "solar electricity"), "local_lexical")
+    # Include an observable query-term gap: a high ESA threshold alone no longer
+    # establishes applicability of an alternative recovery action.
+    result = pipeline.run(Query("q", "solar electricity missing"), "local_lexical")
     assert result.recovery_decision.metadata["recover"]
     assert result.recovery_retrieval is not None and result.recovery_assessment is not None
     assert result.final_state == "abstain" and result.total_retrieval_calls >= 2

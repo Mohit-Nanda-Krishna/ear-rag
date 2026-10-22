@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from dataclasses import dataclass
 import logging
 from typing import Protocol
@@ -10,6 +10,7 @@ from typing import Protocol
 from ear_rag.core.interfaces import EvidenceAssessor, Retriever
 from ear_rag.core.models import EvidenceAssessment, EvidenceDecision, Query, RecoveryAction, RetrievalResult
 from .initial import InitialRetrievalRouter, InitialRoutingDecision, finite_number
+from .learned import make_router
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -17,7 +18,9 @@ _LOGGER = logging.getLogger(__name__)
 
 class ControlRecoveryPolicy(Protocol):
     def decide(self, query: Query, assessment: EvidenceAssessment, retrieval_result: RetrievalResult,
-               *, total_retrieved_chunks: int = 0) -> RecoveryAction: ...
+               *, total_retrieved_chunks: int = 0, available_backends: Collection[str] = (),
+               attempted_backends: Collection[str] = (),
+               query_features: Mapping[str, object] | None = None) -> RecoveryAction: ...
 
 
 @dataclass
@@ -57,7 +60,7 @@ class RetrievalControlPipeline:
         self._available = tuple(name for name, backend in self._backends.items()
                                 if callable(getattr(backend, "retrieve", None)))
         settings = {} if query_analysis is None else query_analysis
-        router = InitialRetrievalRouter(settings)
+        router = make_router(settings)
         self._router = router if settings.get("enabled", False) else None
 
     def run(self, query: Query, initial_backend: str) -> RetrievalControlResult:
@@ -72,12 +75,16 @@ class RetrievalControlPipeline:
         # Dispatch exactly one selected strategy. Composite backends own their calls.
         initial = self._backends[backend_name].retrieve(query, self._top_k, retrieval_action="initial")
         assessment = self._assessor.assess(query, initial)
-        decision = self._policy.decide(query, assessment, initial, total_retrieved_chunks=len(initial.chunks))
+        decision = self._policy.decide(query, assessment, initial, total_retrieved_chunks=len(initial.chunks),
+                                      available_backends=self._available, attempted_backends=(backend_name,),
+                                      query_features=routing.features if routing else None)
         result = RetrievalControlResult(query, initial, assessment, decision, initial_routing=routing,
                                         routing_latency_ms=routing.routing_latency_ms if routing else 0.0)
         if not decision.metadata.get("recover", False):
             return self._finish(result)
         recovery_backend = str(decision.parameters["backend"])
+        if recovery_backend not in self._available:
+            raise ValueError(f"Recovery retrieval backend {recovery_backend!r} is unavailable")
         recovery = self._backends[recovery_backend].retrieve(query, self._top_k, retrieval_action="recovery")
         result.recovery_retrieval = recovery
         result.recovery_assessment = self._assessor.assess(query, recovery)

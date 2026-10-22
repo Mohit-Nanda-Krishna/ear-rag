@@ -72,7 +72,7 @@ class DatasetNormalizer:
         supporting_facts = _list(record, "supporting_facts")
         return NormalizedExample(example_id, "hotpotqa", question, (answer,), documents,
             {"supporting_facts": _json_value(supporting_facts)},
-            {"type": _string(record, "type"), "level": _string(record, "level")})
+            {key: _string(record, key) for key in ("type", "level") if key in record})
 
     def normalize_2wiki_record(self, record: Mapping[str, object]) -> NormalizedExample:
         example_id = _string(record, "id"); question = _string(record, "question")
