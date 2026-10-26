@@ -1,432 +1,492 @@
 # EAR-RAG: Evidence-Aware Adaptive Retrieval with Selective Query Recovery
 
-## Local supervisor dashboard
+EAR-RAG is a local Python research prototype that selects a retrieval strategy,
+assesses the returned evidence, and decides whether one additional retrieval is
+justified. Its CLI and optional Streamlit dashboard expose routing decisions,
+evidence scores, recovery arithmetic, retrieved passages and actual retrieval work.
 
-From `C:\ear-rag` in PowerShell, run:
+The implementation ends at **evidence readiness or abstention**. `ANSWERABLE`
+(internally `final_state="generate"`) means the evidence passed the deterministic
+Evidence Sufficiency Assessment (ESA). **No natural-language answer is generated.**
+Answer correctness and hallucination reduction remain research objectives.
+
+## Quick start
+
+Requirements: **Python 3.11+**; the existing workspace uses **Python 3.12.4**.
+Run commands from the repository root. No API key, GPU, model download or external
+vector database is needed for the current backends.
+
+### New checkout: Windows PowerShell
 
 ```powershell
+Set-Location C:\ear-rag  # replace with your checkout path
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -e .
+.\.venv\Scripts\python.exe -m pytest -q
+.\.venv\Scripts\python.exe -m ear_rag.evaluate_initial --smoke
+```
+
+Use another installed Python version >=3.11 if needed. Calling the environment's
+Python directly avoids a PowerShell activation-policy dependency.
+
+### New checkout: Linux/macOS
+
+```bash
+cd /path/to/ear-rag
+python3 -m venv .venv
+.venv/bin/python -m pip install -e .
+.venv/bin/python -m pytest -q
+.venv/bin/python -m ear_rag.evaluate_initial --smoke
+```
+
+`pip install -e .` reads `requirements.txt` via `pyproject.toml`. Core
+dependencies include PyYAML, PyArrow, pytest, mypy and pre-commit. Streamlit is
+separate in `requirements-dashboard.txt`. This is an editable-checkout workflow:
+configuration and fixture paths resolve from the source tree. Python 3.11 and
+standalone wheel deployment have not been verified.
+
+The smoke command uses a tracked synthetic fixture, compares fixed retrieval
+with initial routing, and disables recovery. It needs no external datasets;
+its scores are integration checks, not research benchmark results.
+
+### Existing workspace
+
+The local environment is named `ai-proj-new`:
+
+```powershell
+.\ai-proj-new\Scripts\python.exe -m ear_rag.evaluate_initial --smoke
+.\ai-proj-new\Scripts\python.exe -m pytest -q
+```
+
+The remaining Windows examples use that environment. Substitute
+`.\.venv\Scripts\python.exe` for a new checkout, or `.venv/bin/python` on
+Linux/macOS. Dataset-dependent commands require the files listed below.
+
+## Implemented architecture
+
+The project separates data preparation, runtime evidence control and offline
+evaluation. Core dataclasses and `Protocol` interfaces define component boundaries.
+
+```mermaid
+flowchart TD
+    D[Local documents] --> P[Validate, normalize and preprocess]
+    P --> C[Deterministic character-window chunks]
+    C --> I[In-memory lexical and hashed-vector indexes]
+    Q[Question text] --> R[Heuristic default router or explicit trained tree]
+    R --> T[One strategy: lexical / vector / hybrid / multi-hop]
+    I --> T
+    T --> E[Deterministic ESA]
+    E --> S{Evidence sufficient?}
+    S -->|Yes| A[ANSWERABLE: evidence ready]
+    S -->|No| G[Filter recovery actions and rank by CAS]
+    G --> W{Eligible action and CAS above threshold?}
+    W -->|No| X[ABSTAIN]
+    W -->|Yes| N[Execute one alternative retrieval]
+    I --> N
+    N --> E2[Mandatory ESA on replacement evidence]
+    E2 --> S2{Evidence sufficient?}
+    S2 -->|Yes| A
+    S2 -->|No| X
+```
+
+Gold answers, support annotations and decomposition labels remain outside runtime
+routing, retrieval, ESA and recovery. Offline evaluators use them to score returned
+evidence. The dashboard presents the existing controller's trace.
+
+### Data preparation and indexing
+
+- Native readers validate labelled HotpotQA and MuSiQue inputs and separate
+  runtime documents from evaluation labels. Normalization tools also handle
+  local 2WikiMultihopQA and NQ-Open inputs.
+- Preprocessing normalizes whitespace, skips empty documents and detects
+  conflicting duplicate document IDs.
+- `DocumentChunker` uses **400-character windows with 50-character overlap**
+  by default. Chunks preserve document identity, metadata, offsets and stable IDs.
+- `RetrievalDataPipeline` persists examples, documents and chunks as JSONL with
+  versioned manifests. Reloading saved chunks rebuilds lexical statistics without
+  re-chunking. Live demos build fresh in-memory indexes.
+
+### Query analysis and initial routing
+
+The default `query_features_v1` policy extracts query-text signals such as exact
+anchors, conceptual wording, mixed requirements and explicit dependencies.
+Configured heuristic scores favor lexical, vector, hybrid or multi-hop retrieval
+respectively. These suitability scores are not probabilities.
+
+Exactly one initial strategy is selected. Low scores, ambiguous margins or
+unavailable choices can use the configured lexical fallback. Decisions record
+features, scores, reason, fallback information and routing latency. Disabling
+`query_analysis.enabled` uses `retrieval.backend` directly.
+
+Optional `query_tree_v1` inference uses a deterministic CART/Gini decision tree
+over the existing query-text features. It requires an explicit artifact path,
+SHA-256 and compatible schema. Invalid artifacts or an unavailable selected backend
+raise an error. The default remains the heuristic router.
+
+### Four retrieval backends
+
+| Backend | Implementation | Underlying calls per invocation |
+| --- | --- | --- |
+| `local_lexical` | Dependency-free BM25-inspired term scoring | 1 |
+| `vector_flat` | Flat cosine search over deterministic hashed-token vectors; default 64 dimensions | 1 |
+| `hybrid` | Normalized lexical/vector score fusion; default weights 0.5/0.5 | 2 |
+| `multihop` | Bounded lexical retrieval with expansion from the first result's first eight tokens | Up to `max_hops` (default 2) |
+
+Vector retrieval has no learned embedding model. Multi-hop uses lexical expansion,
+retaining first-seen chunks in hop order before the final top-k limit. A full
+first hop can occupy every returned position. It does not perform LLM decomposition.
+
+### Evidence Sufficiency Assessment (ESA)
+
+`DeterministicEvidenceAssessor` computes four observable proxies:
+
+| Component | Computation |
+| --- | --- |
+| Relevance | Maximum positive retrieval score `r`, transformed to `r / (1 + r)`; otherwise 0 |
+| Coverage | Fraction of distinct query tokens found in retrieved chunk text |
+| Support | `coverage * min(1, returned_chunk_count / 2)` |
+| Consistency | Distinct normalized chunk texts / returned chunk count; 0 for no chunks |
+
+The overall score is the weighted mean, with **0.25 per component** by default:
+
+- **Sufficient:** ESA >= 0.70.
+- **Uncertain:** 0.40 <= ESA < 0.70.
+- **Insufficient:** ESA < 0.40.
+
+Both uncertain and insufficient evidence enter recovery consideration. These
+signals measure retrieval scores, lexical coverage and duplication. They do not
+verify factual support or contradictions; ESA is not a calibrated probability.
+
+### Cost-aware selective recovery (CAS)
+
+Recovery uses the present evidence state and nominal next-action work:
+
+```text
+deficiency = 1 - current_ESA
+cost = max(0.05 * calls + 0.01 * returned_chunks + 0.001 * latency_ms, 0.05)
+CAS = deficiency * binary_suitability / cost
+```
+
+Candidates must be configured, callable, unattempted and suitable. Binary
+suitability checks an observable gap: missing query tokens, duplicate normalized
+evidence, or fewer than `min(top_k, 2)` chunks. Multi-hop additionally requires a
+dependency signal and a suitable partial lexical seed. Suitability describes
+applicability, not predicted success.
+
+The policy ranks eligible actions with deterministic tie-breaking and executes
+the best only when **CAS > threshold** (default **1.0**). Equality does not qualify.
+
+| Candidate | Nominal calls | Returned chunks | Assumed latency (ms) | Incremental cost |
+| --- | ---: | ---: | ---: | ---: |
+| Lexical / vector | 1 | 5 | 10 | 0.11 |
+| Hybrid / multi-hop | 2 | 5 | 20 | 0.17 |
+
+These are abstract work assumptions, not measured latency predictions or money.
+The controller executes **at most one recovery retrieval**, reassesses the new
+evidence, then returns `ANSWERABLE` or `ABSTAIN`. Recovery evidence **replaces**
+the initial context; the contexts are not combined. Recovery can worsen ESA or
+annotated support coverage.
+
+Actual calls, returned context chunks and retrieval-only latency are recorded
+separately. Composite backends include child calls; child passages and final
+context chunks are separate quantities. Routing latency is separate, and loading/
+indexing are excluded from retrieval latency.
+See [the exact CAS rules](docs/deterministic_cas.md).
+
+## Run the local dashboard
+
+Install the optional UI dependency and launch:
+
+```powershell
+.\ai-proj-new\Scripts\python.exe -m pip install -r requirements-dashboard.txt
 .\ai-proj-new\Scripts\python.exe -B -m streamlit run src/ear_rag/dashboard.py --server.address 127.0.0.1 --browser.gatherUsageStats false
 ```
 
-Open `http://127.0.0.1:8501`. The Live Query Demo runs native MuSiQue questions
-through the unchanged default controller with fresh state. Benchmark Results reads
-existing HotpotQA/MuSiQue artifacts, including Phase 6A router comparisons; it does
-not rerun experiments. All results are development/internal, with independent final
-evaluation pending. See [the demo guide](docs/internal_review_demo_guide.md).
-The optional UI dependency is pinned in `requirements-dashboard.txt` and installed
-in the existing `ai-proj-new` environment. Stop the server with Ctrl+C.
+Open **http://127.0.0.1:8501**. Stop with **Ctrl+C**.
 
-## Research Objective
-This project investigates whether an evidence-aware adaptive retrieval policy can improve answer quality and reduce unsupported/hallucinated answers compared with fixed retrieval and existing adaptive-RAG baselines.
+- **Live Query Demo:** runs selected native MuSiQue dev questions with fresh
+  indexes/controller state. Shows routing, evidence, ESA components, candidate
+  eligibility, CAS arithmetic, recovery, reassessment and final status. Before/
+  after views show new and overlapping parent paragraphs.
+- **Benchmark Results:** reads saved HotpotQA, MuSiQue Phase 5 and Phase 6A
+  reports without rerunning experiments.
 
-## Architecture Components (Planned)
-1. Query analysis
-2. Adaptive initial retrieval
-3. Evidence Sufficiency Assessment (ESA)
-   - Relevance
-   - Coverage
-   - Support
-   - Consistency
-4. Confidence classification
-   - High / sufficient
-   - Uncertain
-   - Low / insufficient
-5. Selective recovery
-   - Increase k
-   - Alternative retriever
-   - Query reformulation
-   - Query decomposition
-   - Hybrid retrieval
-6. Re-retrieval
-7. ESA reassessment
-8. Local/open-source LLM generation
-9. Confidence estimation
-10. Optional abstention
-11. Evaluation against fixed and adaptive baselines
+The live tab requires
+`data/raw/musique/official_v1_0/musique_ans_v1.0_dev.jsonl`.
+Benchmark groups require saved directories referenced by `dashboard_data.SOURCES`
+under `outputs/`. Missing files are reported explicitly. These ignored files are
+not supplied by cloning the repo or installing Streamlit.
 
-## Current Implementation Status
+Two documented real-data examples demonstrate successful recovery and executed
+recovery followed by abstention. See the
+[internal review demo guide](docs/internal_review_demo_guide.md) for IDs, source
+hashes, evidence and replay instructions.
 
-**Final completion check (2026-10-22): the current retrieval/controller software
-and Phase 6A development workflow are complete; independent final evaluation
-remains blocked.**
-No verified protected MuSiQue paragraph-support labels, authorized compatible
-blind scorer, or sufficient candidate prior-use evidence is available. No final
-benchmark ran. The required next step is access/independence verification, not
-more development runs or model changes. See the [Phase 6B audit](outputs/phase6b-protected-evaluation-audit-20261022T161807Z-7e19b0ef/REPORT.md).
+## Run the command-line demo
 
-Phase 6A router training and development selection are implemented using the
-official MuSiQue train/dev splits. The selected artifact is a **depth-0 decision
-tree that always chooses lexical**; it matches fixed lexical on dev and provides
-no observed query-dependent routing benefit. The project default remains the
-original heuristic; learned inference requires explicit configuration and a
-validated artifact. ESA, CAS, recovery and backends are unchanged.
+The CLI supports **HotpotQA** and **2WikiMultihopQA** normalized inputs.
+It does not accept `--dataset musique`; use the dashboard/native API for MuSiQue.
+Supply the corresponding files first:
 
-[Phase 6A report, commands and limitations](outputs/phase6a-router-development-20261022T155210Z-95732e1d/REPORT.md)
-and [selected model](outputs/phase6a-router-development-20261022T155210Z-95732e1d/model.json).
-All development results are **development/internal — exposure limitations apply**.
-The official offline gold scorer exists; protected-test gold and compatible
-authorized scoring access remain unverified. Dev is model-selection data, not
-a final test. No answer correctness or hallucination claim is supported.
-
-The training command uses the existing environment and writes exclusively to a
-new prepared output directory (see the frozen protocol/report before running):
+| Dataset | Runtime examples | Separate evaluation records |
+| --- | --- | --- |
+| `hotpotqa` | `data/processed/hotpotqa_normalized.jsonl` | `data/processed/evaluation/hotpotqa_evaluation.jsonl` |
+| `2wiki` | `data/processed/2wiki_normalized.jsonl` | `data/processed/evaluation/2wiki_evaluation.jsonl` |
 
 ```powershell
-.\ai-proj-new\Scripts\python.exe -B -m ear_rag.router_training --output outputs/<new-prepared-directory>
+# Interactive menu: compare, controller, evidence, small evaluation, exit
+.\ai-proj-new\Scripts\python.exe -m ear_rag.demo --dataset hotpotqa
+
+# Compare all four retrieval strategies for one question
+.\ai-proj-new\Scripts\python.exe -m ear_rag.demo --dataset hotpotqa --mode compare --index 0
+
+# Run initial retrieval, ESA and bounded recovery
+.\ai-proj-new\Scripts\python.exe -m ear_rag.demo --dataset hotpotqa --mode ear-rag --index 0
+
+# Supplied text against the selected normalized dataset corpus
+.\ai-proj-new\Scripts\python.exe -m ear_rag.demo --dataset hotpotqa --mode ear-rag --index 0 --query-text "Where was the author born?"
+
+# Show flags without loading data
+.\ai-proj-new\Scripts\python.exe -m ear_rag.demo --help
 ```
 
-For inference only, load the saved explicit settings; no training or labels are
-required. The same query_analysis settings work with RetrievalControlPipeline:
+Indices are zero-based. In the interactive menu, run comparison or the controller
+before selecting **View Retrieved Evidence**; it uses the current process's last
+results. CLI demos index pooled normalized documents across loaded examples.
+Native condition evaluation builds a separate candidate corpus per question;
+the two workflows' scores are not interchangeable.
+
+## Configuration
+
+Defaults live in [configs/config.yaml](configs/config.yaml). The demo/dashboard
+load this file, but use their own explicit dataset paths. Changing `data.dataset`
+alone does not change those inputs.
+
+| Setting | Default / purpose |
+| --- | --- |
+| `data.dataset` | `fixture`, for the configurable persistent data pipeline |
+| `query_analysis.enabled`, `.policy` | `true`, `query_features_v1` |
+| `query_analysis.fallback_backend` | `local_lexical` |
+| `query_analysis.minimum_score`, `.minimum_margin` | 1.0, 0.25 |
+| `retrieval.backend` | `local_lexical` when routing is disabled |
+| `retrieval.default_top_k`, `.max_top_k` | 5, 20 |
+| `chunking.size`, `.overlap` | 400, 50 characters; used by current backend factory |
+| `vector.dimensions` | 64 hashed-token dimensions |
+| `hybrid.lexical_weight`, `.vector_weight` | 0.5, 0.5 |
+| `multihop.max_hops` | 2 |
+| `evidence_assessment.sufficient_threshold`, `.uncertain_threshold` | 0.70, 0.40 |
+| `recovery.max_recovery_rounds` | 1; 0 disables recovery |
+| `recovery.max_retrieved_chunks` | 20; policy budget guard before recovery |
+| `recovery.cost_awareness.policy` | `evidence_sufficiency_cas_v1` |
+| `recovery.cost_awareness.cost_efficiency_threshold` | 1.0, strict comparison |
+| `generation.enabled`, `models.generator` | `false`, `null`; no runtime generator |
+
+`recovery.max_attempts` is a compatibility alias; current factories use
+`max_recovery_rounds`. Increasing that limit does not make the current pipeline
+a multi-round loop. Nominal recovery call budgets must match backend structure,
+including the configured multi-hop hop count.
+
+## Data and evaluation workflow
+
+Tracked fixtures in `data/fixtures/` support tests and smoke checks. Raw datasets,
+processed corpora, indexes and experiment outputs are ignored by Git. Dependency
+installation does not download or prepare them.
+
+Native HotpotQA/MuSiQue evaluation uses **question-scoped candidate pools**,
+rather than full-Wikipedia retrieval. Runtime projections retain question text,
+document text and safe source identity. Answers, supporting facts, support flags
+and decomposition annotations stay evaluation-only. MuSiQue uses native paragraph
+IDs to preserve distinct evidence with repeated titles. NQ-Open still needs a
+separate retrieval corpus.
+
+`ear_rag.condition_evaluation.evaluate_conditions(dataset, cases, config)`
+runs six conditions on the same requested cases with fresh indexes/controller state:
+
+1. Fixed lexical, no recovery.
+2. Fixed vector, no recovery.
+3. Fixed hybrid, no recovery.
+4. Fixed multi-hop, no recovery.
+5. Query-aware initial routing, no recovery.
+6. Adaptive controller with configured recovery.
+
+Reports distinguish requested, evaluated, failed and excluded cases. Metrics
+include Hit@5, supporting-document/paragraph Recall@5, applicable HotpotQA sentence
+coverage, recovery/abstention and actual work. MuSiQue sentence coverage is
+unavailable, rather than substituted with paragraph recall. Parent metrics
+deduplicate parent IDs among the **first five returned chunks**.
+
+Reports use JSON/JSONL/CSV with configuration and provenance metadata; experiment
+drivers freeze source/input hashes. Read the
+[evaluation protocol](docs/evaluation_protocol.md) for validation, exclusions,
+exposure checks and splits. Preparation uses APIs such as `read_hotpotqa`,
+`read_musique`, `NormalizedCorpusBuilder` and `RetrievalDataPipeline`.
+
+### Development evaluation commands
+
+The initial-routing evaluator accepts an explicit config and saves reports:
+
+```powershell
+.\ai-proj-new\Scripts\python.exe -m ear_rag.evaluate_initial --dataset hotpotqa --examples 20 --sampling seeded --seed 1729 --config configs/config.yaml --output-dir outputs/local-initial-routing
+```
+
+It requires normalized CLI inputs and disables recovery. Its pooled-corpus
+workflow differs from native six-condition evaluation.
+
+The MuSiQue driver provides `run` and `verify` modes:
+
+```powershell
+.\ai-proj-new\Scripts\python.exe -m ear_rag.musique_experiment --help
+```
+
+A new `run --output outputs/<new-unique-name>` requires local native inputs and a
+frozen development protocol; it rejects existing directories. Historical Phase 5
+`verify` checks frozen source hashes and needs the matching Phase 5 implementation.
+Later Phase 6A changes can make that historical check fail even when saved reports
+remain readable. Preserve existing experiment directories.
+
+### Optional trained routing
+
+Phase 6A fits deterministic trees on official MuSiQue train and selects on dev.
+Offline targets prefer paragraph recall, then fewer retrieval calls, then a fixed
+backend tie-break. Inference uses query-text features only.
+
+The selected artifact has **depth 0 and always chooses lexical**. It matches
+fixed lexical on dev and shows no query-dependent routing benefit. The default
+controller still uses `query_features_v1`.
+
+If saved Phase 6A artifacts are present, inference can load their explicit settings:
 
 ```python
 from ear_rag.config.loader import load_config
 from ear_rag.routing.learned import make_router
 
-config = load_config("outputs/phase6a-router-development-20261022T155210Z-95732e1d/selected_config.json")
+config = load_config(
+    "outputs/phase6a-router-development-20261022T155210Z-95732e1d/selected_config.json"
+)
 router = make_router(config["query_analysis"])
-decision = router.select("Where was the author born?", ("local_lexical", "vector_flat", "hybrid", "multihop"))
+decision = router.select(
+    "Where was the author born?",
+    ("local_lexical", "vector_flat", "hybrid", "multihop"),
+)
 print(decision.selected_strategy)
 ```
 
-Missing or incompatible artifacts fail explicitly; there is no learned-router
-fallback. Relocating the artifact requires updating its path while retaining its
-SHA-256. No new ML dependency was installed. Final evaluation remains pending.
+Supply the same `query_analysis` settings to `RetrievalControlPipeline` for
+controller use. Moving the model requires updating its path and retaining its
+expected checksum. The research training entry point is
+`python -m ear_rag.router_training --output outputs/<new-prepared-directory>`.
+It requires official local train/dev files, acquisition manifests and a prepared
+output directory containing `PROTOCOL.md`. Training is separate from setup and
+dashboard use.
 
-MuSiQue official-dev ingestion and a six-condition development comparison are
-now available, labelled **development/internal — exposure limitations apply**.
-See [the saved results](outputs/phase5-musique-development-internal-20261022T153801Z-cfdcea73/REPORT.md)
-and [native data/metric protocol](docs/evaluation_protocol.md). Adaptive paragraph
-Recall@5 was .473900 versus .437043 for router-only and .479555 for fixed lexical;
-this does not establish answer correctness, unseen generalization or hallucination
-reduction. Native paragraph IDs handle repeated titles; HotpotQA sentence coverage
-is unavailable on MuSiQue. Existing runtime policy/configuration is unchanged.
+## Current results and limits
 
-Historical Phase 5 verification checks the frozen Phase 5 source hashes; it needs
-that implementation, rather than the subsequently extended Phase 6A runtime.
-Its original read-only command (PowerShell) is:
+Completed evaluations are **development/internal** with exposure limitations.
+They do not establish unseen generalization, answer correctness, hallucination
+reduction or superiority over published systems.
 
-```powershell
-Set-Location C:\ear-rag
-.\ai-proj-new\Scripts\python.exe -B -m ear_rag.musique_experiment verify --output outputs/phase5-musique-development-internal-20261022T153801Z-cfdcea73
+The saved MuSiQue official-dev study evaluated 2,417 questions with zero
+failures/exclusions:
+
+| Condition | Paragraph Recall@5 | Underlying retrieval calls |
+| --- | ---: | ---: |
+| Fixed lexical | 0.479555 | 2,417 |
+| Query-aware, no recovery | 0.437043 | 2,493 |
+| Adaptive controller | 0.473900 | 2,810 |
+
+Recovery improves recall over the heuristic router alone in this study, while
+fixed lexical achieves higher recall with fewer calls. Phase 6A's constant router
+also has dev recall 0.479555. These are evidence metrics.
+
+The revised-CAS HotpotQA diagnostic run evaluated 497 of 500 requested exposed
+questions, with three exclusions and no failures. Adaptive document recall rose
+1.509 percentage points over query-aware/no-recovery, but stayed 1.811 points
+below fixed lexical while using 40 more calls. Older expected-gain-policy reports
+describe a previous controller and do not validate current CAS.
+
+The **2026-10-22 protected-evaluation audit** recorded independent final evaluation
+as blocked: verified protected support labels, compatible authorized scoring access
+and sufficient candidate independence/prior-use evidence were not established.
+No final benchmark ran. Dev used for model selection cannot be an independent test.
+
+These local reports are under ignored `outputs/`; links need those directories:
+
+- [MuSiQue development study](outputs/phase5-musique-development-internal-20261022T153801Z-cfdcea73/REPORT.md).
+- [Revised-CAS HotpotQA diagnostic study](outputs/phase5-revised-cas-development-internal-known-exposure-20261022T125412Z-0e6adb98/REPORT.md).
+- [Phase 6A router training and selection](outputs/phase6a-router-development-20261022T155210Z-95732e1d/REPORT.md).
+- [Phase 6B protected-evaluation audit](outputs/phase6b-protected-evaluation-audit-20261022T161807Z-7e19b0ef/REPORT.md).
+
+Future work includes learned semantic retrieval, calibrated evidence/control
+policies, general query reformulation/decomposition, answer generation and
+independent answer-level evaluation. Recovery enums and generator interfaces
+do not imply those operations are implemented.
+
+## Code structure
+
+```text
+ear-rag/
+|-- src/ear_rag/
+|   |-- config/                  # YAML loading and helpers
+|   |-- core/                    # Dataclasses, enums and Protocol interfaces
+|   |-- data/                    # Readers, normalization, validation, persistence
+|   |   |-- hotpotqa*.py         # Reader, policy, split and evidence tools
+|   |   `-- musique*.py          # Reader and paragraph evidence mapping
+|   |-- retrieval/               # Chunking, lexical, vector, hybrid, multi-hop
+|   |-- evidence/esa.py          # Four-component deterministic ESA
+|   |-- routing/
+|   |   |-- query_analysis.py    # Query-text features
+|   |   |-- initial.py           # Default heuristic router
+|   |   |-- learned.py           # Optional tree and strict artifact loading
+|   |   |-- cost_awareness.py    # Suitability, nominal cost and CAS
+|   |   |-- recovery.py          # Candidate selection and stopping rules
+|   |   `-- pipeline.py          # Retrieval, ESA, recovery and reassessment
+|   |-- demo.py                  # Normalized-data CLI and backend factory
+|   |-- dashboard.py             # Optional Streamlit UI
+|   |-- dashboard_data.py        # Trace views and saved report reader
+|   |-- evaluate_initial.py      # Routing evaluator and fixture smoke CLI
+|   |-- control_evaluation.py    # Native cases and offline gold scoring
+|   |-- condition_evaluation.py  # Isolated six-condition comparison API
+|   |-- evaluation_*.py          # Metrics, label resolution and serialization
+|   |-- musique_experiment.py    # Frozen development run/verify driver
+|   `-- router_training.py       # Official train/dev router development
+|-- configs/config.yaml          # Tracked runtime defaults
+|-- data/fixtures/               # Tracked deterministic test/smoke inputs
+|-- data/{raw,processed,indexes}/ # Ignored local data and persisted artifacts
+|-- outputs/                    # Ignored reports, models and traces
+|-- tests/                      # Contract, data, retrieval, control, UI and eval
+|-- docs/                       # Protocols, audits and demo guides
+|-- pyproject.toml              # Package metadata; editable src layout
+|-- requirements.txt            # Core dependency source
+|-- requirements-dashboard.txt  # Optional pinned Streamlit
+|-- PROGRESS.md                 # Historical implementation/verification record
+`-- AGENT_HANDOFF.md            # Current checkpoint and continuation context
 ```
 
-The module also provides `run --output outputs/<new-unique-name>` over the existing
-condition runner. Use only after ingestion/isolation/regression gates pass and
-an explicitly frozen development protocol; it rejects existing output directories.
-No data download or new dependency is needed for that historical workflow. Phase
-6A training is recorded separately above; Phase 5 outputs remain unchanged.
-
-The Python package in `src/ear_rag/` implements local dataset processing,
-retrieval, deterministic evidence assessment, and bounded cost-aware recovery.
-Query-aware initial routing is enabled in `configs/config.yaml`:
-
-`Question -> lightweight query analysis -> one initial strategy -> evidence -> ESA -> at most one recovery -> ANSWERABLE or ABSTAIN`.
-
-The provisional scoring policy favors lexical retrieval for exact anchors,
-vector-flat for conceptual phrasing, hybrid for mixed requirements, and bounded
-multi-hop for explicit dependent requirements. It returns features, heuristic
-suitability scores, a reason, fallback information, and router latency. Ambiguous
-or unavailable choices use the configured fallback. Disabling query analysis
-restores `retrieval.backend`. Initial selection never consults gold labels, ESA
-outcomes, or predicted recovery success; recovery-aware initial selection is deferred.
-
-Backends are research prototypes: BM25-inspired lexical scoring, hashed-token
-vectors rather than learned dense embeddings, score-fusion hybrid, and bounded
-lexical expansion rather than learned multi-hop decomposition. No LLM answer
-generation is implemented. The planned architecture above includes future work.
-
-See [routing policy, configuration, tests and measured evaluation](docs/initial_routing.md)
-and [demo usage](docs/demo_40_percent.md).
-
-Recovery now uses deterministic evidence-sufficiency CAS:
-`CAS=(1-current_ESA)*binary_suitability/max(.05*calls+.01*chunks+.001*latency_ms,.05)`.
-It ranks executable, allowed, unattempted actions and recovers only when CAS is
-strictly greater than the configured threshold (currently 1.0). Suitability uses
-observable evidence gaps; no predicted ESA/gain or learned recovery model remains.
-Costs are nominal incremental work assumptions, separate from realized telemetry.
-See [exact rules, costs, interfaces and limitations](docs/deterministic_cas.md).
-Phase 5.5D/5.6 outputs describe the previous policy and do not validate this change;
-the current condition version is `ear_rag_conditions_v2_cas`. A separate
-[frozen revised-CAS evaluation](outputs/phase5-revised-cas-development-internal-known-exposure-20261022T125412Z-0e6adb98/REPORT.md)
-is now complete, labelled **development/internal — known exposure**.
-
-The [500-query validation study](docs/query_analysis_validation.md) adds per-query
-fallback causes, evidence-label coverage, decision regret, paired comparisons and
-JSON/CSV reports. It preserves the existing routing policy and documents where
-its features and prototype backends fail.
-
-## Dataset and evaluation roadmap
-
-**Current Phase 5 status (verified 2026-10-22): partially complete.** Data/evidence
-and evaluation tooling, the condition runner, and revised deterministic CAS are
-implemented and pass software verification. The six-condition Phase 5.5D run and
-Phase 5.6 analysis are complete **development/internal — known exposure** work
-under the previous expected-gain policy. The revised CAS was separately evaluated
-on the same 497 usable exposed questions: all six conditions completed without
-failures, retaining three exclusions from 500 requests. Adaptive document recall
-rose 1.509 percentage points over query-aware/no-recovery (paired bootstrap 95%
-interval .503–2.616), with 19 extra calls, but remained below fixed lexical recall
-by 1.811 points while using 40 more calls. Of 19 recoveries, evidence coverage
-improved 13, tied 3 and worsened 3. These are diagnostic cohort results.
-Original source-provenance, exposure-history and approved holdout/split
-gates remain unresolved; the proposed 100/200 roles are still provisional.
-See the [current diagnostic evaluation and remaining gates](docs/evaluation_protocol.md#19-frozen-revised-cas-diagnostic-evaluation-2026-10-22).
-
-Phase 5.5C adds the small Python API
-`ear_rag.condition_evaluation.evaluate_conditions(dataset, cases, config)`.
-It returns existing evaluator reports for four fixed backends without recovery,
-query-aware selection without recovery, and the adaptive controller. Each case
-gets fresh indexes and controller state; comparable conditions share candidate
-pools, top-k and backend settings. Fixed conditions bypass initial selection.
-Reports include condition/configuration metadata and reuse existing serialization.
-See [condition definitions and usage](docs/evaluation_protocol.md#17-phase-55c-minimal-baseline-condition-runner).
-The Phase 5.5C checkpoint used synthetic fixtures only (17 new tests; 423 total).
-Subsequent authorized Phase 5.5D evaluation requested the same 500 exposed IDs in
-all six conditions: 497 evaluated, zero failures and three explicit exclusions.
-The [saved experiment report](outputs/phase55d-development-internal-known-exposure-20261020T185946Z-c62ca682/REPORT.md)
-and [Phase 5.6 analysis](outputs/phase56-analysis-development-internal-known-exposure-20261020T191125Z-ab9ca032/PHASE56_FINAL_REPORT.md)
-remain previous-policy evidence. Current focused CAS/regression checks pass 114
-tests; the full suite passes 470 tests. Passing invalid-record checks or software
-tests grants neither exposure clearance nor effectiveness evidence.
-
-[Phase 5.1 protocol](docs/evaluation_protocol.md) documents the proposed first
-dataset: a small HotpotQA distractor development subset with **per-question
-candidate pools**, not full-Wikipedia retrieval. It separates runtime questions/
-documents, development labels and held-out labels; defines metrics and leakage
-checks; and gives the Phase 5.2/5.3 plan. Proposed 100 development / 200 internal
-held-out roles within official dev require review and a prior-exposure inventory.
-Earlier development examples cannot be treated as unseen test questions.
-
-Phase 5.2 now provides a labelled train/dev JSON-array reader and separate runtime
-and evaluation projections in `ear_rag.data.hotpotqa`, verified with synthetic
-fixtures. It rejects malformed/duplicate records and unresolved supporting facts;
-it does not support unlabelled blind-test inputs. Type/level are optional offline
-annotations. The [bounded real-data gate](docs/evaluation_protocol.md#10-bounded-real-data-completion-gate-2026-10-20)
-parsed the 500-record fullwiki JSONL and 7,405-record distractor Parquet. All 500
-IDs/questions/answers/supports match; candidate contents differ for 362 questions
-(138 differ only in order). At that gate real preparation was blocked: 49 Parquet records
-have blank candidate sentences and one has an out-of-range support index. Source
-lineage and complete exposure history are unresolved; existing reports establish
-exposure to all 500 sample IDs. No production adapter or real split was created
-at that checkpoint. Later policy-aware development preparation explicitly
-excluded three of those IDs and retained a strict 497-record copy for Phase 5.5D;
-this did not approve an exposure-cleared split. The 100/200 roles remain provisional.
-
-The [resumed JSON audit](docs/evaluation_protocol.md#12-exact-path-distractor-json-audit---verification-complete-preparation-blocked)
-verified the now-present `hotpot_dev_distractor_v1.json`: 46,320,117 bytes,
-7,405 unique IDs and the exact user-supplied SHA256. All records and their order
-match Parquet after field mapping, including the same 50 validation anomalies.
-JSON format availability is resolved; input quality, independent provenance and
-complete exposure history still block preparation. Local download metadata points
-to Hugging Face's CDN, without authenticating an official upstream revision.
-
-`ear_rag.data.hotpotqa_splits` now provides explicit-size split planning,
-ID/normalized-text/exposure checks and a new-directory artifact writer. Missing
-or partial exposure history blocks holdout; an explicit empty inventory is never
-inferred from missing files. Checks cover supplied history only, not semantic
-near-duplicates. Manifests record source/checksum, selection/seed, role IDs,
-validation counts, aliases/exclusions and output hashes.
-
-Verified synthetic ingestion/split checks:
+## Verification and troubleshooting
 
 ```powershell
-.\ai-proj-new\Scripts\python.exe -m pytest tests/test_hotpotqa_splits.py tests/test_hotpotqa_ingestion.py -q
-```
-
-The API flow is `read_hotpotqa(..., source_split="dev")`, then
-`runtime_projection` / `evaluation_projection`, and optionally `plan_splits` or
-`write_split_artifacts` with explicitly chosen counts and an `ExposureInventory`.
-The writer requires a new destination and separates each role's runtime and label
-JSONL. No reader CLI or approved real-data preparation command is claimed. Treat
-the combined `HotpotQADataset.examples` as offline records; use the runtime
-projection rather than legacy normalized-example serialization for retrieval.
-Phase 5.2 synthetic verification passed **318 tests** in the complete suite
-(57 new cases); scoped mypy passed for both new modules. Split utilities are
-implemented, but no exposure-cleared dataset release or holdout split is approved.
-Initial-only and bounded-controller evaluation wiring were subsequently implemented
-and used in the explicitly authorized development/internal experiment.
-
-The scoped [Phase 5.3 corpus/evidence layer](docs/evaluation_protocol.md#14-phase-53-corpusevidence-layer)
-is implemented. `inspect_hotpotqa` exposes record positions, IDs and validation
-reasons while `read_hotpotqa` still rejects an entire malformed input. Inspection
-examples are diagnostics, not an approved filtered dataset.
-`ear_rag.data.hotpotqa_evidence.build_question_corpus` adapts a fully valid dataset
-into one question's candidate pool using existing `Query`/`Document` contracts.
-`locate_evidence` maps existing backend chunks to source context and sentence
-positions; `match_supporting_evidence` joins labels offline and distinguishes
-title hits from complete sentence coverage, including coverage across chunks.
-All four existing backend contracts pass synthetic compatibility tests. The Phase
-5.3 checkpoint passed **349 tests**. Phase 5.2 remains **partially blocked** for
-exposure-cleared preparation: the anomaly policy is implemented, while independent
-provenance and complete exposure history are unresolved. No real inputs, splits
-or results were produced at the Phase 5.3 checkpoint; later development/internal
-inputs and results are described above.
-
-[Phase 5.4 evaluation infrastructure](docs/evaluation_protocol.md#15-phase-54-evaluation-infrastructure-and-metrics)
-is implemented in `ear_rag.control_evaluation`. `evaluate_cases` takes explicit
-case requests and a fresh, documents-only pipeline factory, records initial and
-terminal retrieval/ESA/recovery/abstention, then joins supporting labels offline.
-It reports Hit@5, supporting-document Recall@5 and complete supporting-sentence
-coverage@5; terminal metrics use recovery evidence alone when present.
-Failed and explicitly excluded cases remain in versioned per-case JSONL and
-aggregate JSON. Missing calls/latency/work stay `null`, with observation counts.
-`write_evaluation_report` writes only to a new output directory. No real run or
-benchmark CLI was added. Synthetic regression status: **381 tests passed**.
-
-The [versioned invalid-record policy](docs/evaluation_protocol.md#16-phase-52-auditable-invalid-record-policy)
-is now implemented in `ear_rag.data.hotpotqa_policy`. Its
-[machine-readable audit](docs/hotpotqa_invalid_record_policy_audit_v1.json)
-reproduces 49 blank-sentence exclusions and one out-of-range-support exclusion
-on the current 7,405-record JSON. It preserves all applicable policy reason codes,
-source positions and details without changing raw data or producing a filtered
-dataset. The 7,355 records counted as valid passed strict record/identity checks;
-**none is automatically approved for evaluation**. Ambiguous identity/structure
-is otherwise invalid and explicitly flagged as unclassifiable. Reproduce an audit
-with `python -m ear_rag.data.hotpotqa_policy SOURCE --output NEW_AUDIT.json`;
-existing outputs cannot be overwritten. This closes the policy/audit task, while
-provenance, exposure and 100/200 allocation remain unresolved. ESA
-sufficiency does not establish answer correctness; retrieval metrics are not
-answer EM/F1. Phase 5.5C/5.5D and the previous-policy Phase 5.6 analysis have since
-been completed within their documented scopes.
-
-No new dataset, split or experiment was produced during the CAS correction or
-this status reconciliation. Existing previous-policy results remain intact.
-The legacy pooled-context, recovery-disabled evaluator remains separate from the
-per-question controller driver.
-Answer EM/F1 remains unavailable because there
-is no answer generator. Full-corpus retrieval and 2Wiki are later extensions.
-
-## Setup and validate
-
-Python 3.11+ is required (`StrEnum` and `typing.Self`); this phase was verified
-on Python 3.12.4. The existing environment is `ai-proj-new`, not `.venv`.
-From `C:\ear-rag` in Windows PowerShell:
-
-```powershell
-.\ai-proj-new\Scripts\python.exe -m pip install -e .
 .\ai-proj-new\Scripts\python.exe -m pytest -q
 .\ai-proj-new\Scripts\python.exe -m pip check
+git diff --check
 ```
 
-The editable installation uses `requirements.txt` as its single dependency source,
-including existing development tools and the required `pyarrow` Parquet reader.
-It makes `ear_rag` importable without setting `PYTHONPATH`. This is a development
-checkout installation: keep `src/`, `configs/`, and tracked fixtures together;
-standalone wheel deployment is not verified. Editable installation, isolated
-imports/config loading, and Parquet normalization tests passed on Python 3.12.4;
-see [PROGRESS.md](PROGRESS.md) for results and remaining work.
+Tests cover contracts, persistence, data validation/label isolation, retrieval,
+routing, ESA/CAS, reassessment, abstention, evaluation accounting, learned
+artifacts and dashboard behavior. Dashboard tests require optional Streamlit.
+Passing software tests does not establish research effectiveness.
 
-For a fresh checkout, create a virtual environment first, then install the package.
-This creation/activation/install sequence was verified in a temporary source-only
-snapshot with no local datasets and a fresh Python 3.12.4 environment:
+| Symptom | What to check |
+| --- | --- |
+| `No module named ear_rag` | Run `python -m pip install -e .` in the same environment. |
+| `No module named streamlit` | Install `requirements-dashboard.txt` in that environment. |
+| Missing normalized JSONL | Supply runtime and evaluation files above; use `evaluate_initial --smoke` for a data-independent check. |
+| Dashboard missing data/reports | Supply native MuSiQue dev data or saved outputs; dependency installation does not create them. |
+| Trained router cannot load | Check explicit settings, artifact path, SHA-256 and feature schema. |
+| Recovery runs but returns `ABSTAIN` | Check actual post-recovery ESA; CAS acceptance does not guarantee sufficiency. |
 
-```powershell
-python -m venv .venv
-. .\.venv\Scripts\Activate.ps1
-python -m pip install -e .
-python -m pytest -q
-python -m pip check
-```
-
-Verified activation of the existing environment uses
-`. .\ai-proj-new\Scripts\Activate.ps1`. Explicit interpreter commands above also
-work without activation or changes to PowerShell execution policy.
-
-Verified package/CLI smoke checks:
-
-```powershell
-.\ai-proj-new\Scripts\python.exe -c "import ear_rag; print(ear_rag.__file__)"
-.\ai-proj-new\Scripts\python.exe -m ear_rag.demo --help
-```
-
-Running the interactive demo (`python -m ear_rag.demo`) additionally requires
-local normalized HotpotQA files in `data/processed/`; those files are ignored by
-Git and absent from a fresh clone. Automated demo tests instead generate temporary
-synthetic inputs and exercise the real loader, retrievers and controller. No
-external datasets are needed by the test suite. Both the existing environment and
-the fresh installation passed **244 tests** during Phase 1, with no skips. The
-Phase 2 baseline passed 244 tests; the final suite passed **261 tests**, with no
-failures or skips, including 17 new runtime regression cases.
-Python 3.11 execution and standalone wheel deployment remain unverified.
-No datasets or models were downloaded.
-
-## Verified retrieval/controller demo
-
-Historically, before the deterministic CAS replacement, these commands were run
-with the existing local normalized HotpotQA files:
-
-```powershell
-.\ai-proj-new\Scripts\python.exe -m ear_rag.demo --dataset hotpotqa --mode ear-rag --index 0
-.\ai-proj-new\Scripts\python.exe -m ear_rag.demo --dataset hotpotqa --mode ear-rag --index 0 --query-text "unmatched deterministic vocabulary"
-@('2','0','3','5') | .\ai-proj-new\Scripts\python.exe -m ear_rag.demo
-```
-
-The first command selected lexical retrieval, returned five evidence chunks,
-scored ESA 0.936 sufficient and reported `ANSWERABLE` without recovery. The
-unmatched-query command performed one vector recovery and a mandatory second ESA
-(0.298), then reported `ABSTAIN` after two leaf retrieval calls. Its predicted
-post-recovery ESA was 0.892; this estimate did not match the actual result.
-The last command exercised the interactive controller, evidence view and exit
-with scripted input. Evidence titles now use the source document metadata
-preserved by chunking. Evaluation mode, invalid interactive input and other
-unexercised menu paths remain unverified in Phase 2.
-
-Automated subprocess checks also exercise comparison, controller, evidence view
-and exit on temporary synthetic inputs. Real-backend tests verify empty results,
-sufficient initial evidence, recovery success, mandatory reassessment, abstention
-and disabled/unconfigured recovery. These test cases do not constitute research
-evaluation, and synthetic recovery-success cases deliberately give the initial
-index no documents while the alternative index has evidence.
-
-`ANSWERABLE` (internally `final_state='generate'`) means evidence passed the
-deterministic ESA. **No answer is generated**: generation is disabled and there
-is no runtime generator, deterministic or language-model-based. Operational
-retrieval costs and nominal incremental CAS costs are not calibrated monetary costs.
-Per-run retrieval-call counts include actual child operations for Hybrid and
-Multi-hop. Returned context chunks and child retrieved passages are separate
-quantities; retrieval latency excludes separately reported routing time, loading
-and indexing. The current demo prints deficiency, binary suitability, incremental
-cost and CAS instead of predicted ESA/gain, and still prints actual second ESA.
-
-Recovery disabled by its round limit or without configured candidates performs no
-recovery. Unavailable candidates are explicitly excluded before CAS ranking; if
-none remain, recovery stops. The dispatch guard still rejects an unavailable action
-returned by a custom policy. No hidden retrieval retry is added.
-
-The existing offline evaluator compares fixed strategies with query-aware routing
-with recovery disabled. Its tracked synthetic fixture and historical reports are
-documented in [the routing guide](docs/initial_routing.md). Evaluation commands
-and new research experiments are outside this reliability phase.
-
-The initial 20-question HotpotQA development check did not establish improvement:
-routed local-support recall@5 was 75%, versus fixed lexical 87.5%, among 16 queries
-with locally resolved support labels. Rules are provisional and need development-set
-calibration; freeze settings before independent test evaluation. Details and label
-coverage caveats are in the [evaluation report](docs/initial_routing.md#measured-development-check-2026-10-09).
-
-## Repository Structure
-```
-ear-rag/
-├── src/ear_rag/          # Python package
-├── configs/              # Configuration files
-├── data/                 # Raw and processed data
-├── tests/                # Test suite
-├── outputs/              # Logs and results
-└── docs/                 # Documentation
-```
-
-## Original Implementation Roadmap
-
-These were the original phase labels; current implemented and verified status is
-summarized above and recorded in [PROGRESS.md](PROGRESS.md).
-- **Phase 1.1**: Project foundation ✓
-- **Phase 1.2**: Configuration and Core Interfaces
-- **Phase 2.x**: RAG pipeline implementation
-- **Phase 3.x**: Evaluation and baselines
-
-## Note
-
-Consult [PROGRESS.md](PROGRESS.md) for phase history. Current routing and ESA are
-deterministic baselines, not learned or calibrated policies; generation and
-independent dataset-scale research validation remain future work. The existing
-local development evaluations do not establish a research improvement.
+Further reading: [routing policy](docs/initial_routing.md),
+[CAS specification](docs/deterministic_cas.md),
+[evaluation protocol](docs/evaluation_protocol.md),
+[query-analysis validation](docs/query_analysis_validation.md),
+[MuSiQue audit](docs/musique_dataset_audit.md), and
+[internal review demo guide](docs/internal_review_demo_guide.md).

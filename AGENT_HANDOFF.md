@@ -1,5 +1,30 @@
 # Agent Handoff
 
+## COMPLETED README architecture and usage refresh (2026-10-26)
+
+Original task: update README to explain the final architecture, implemented
+features, code structure, setup and run instructions. Documentation-only scope.
+Completed: rewrote README.md around current architecture, a Mermaid flow,
+data/label boundaries, four backends, exact ESA/CAS rules, portable fresh-checkout
+setup, existing environment, CLI/dashboard prerequisites and commands, config,
+six-condition evaluation, optional trained router, results/limits and code tree.
+Read documentation, agent-handoff and live error-logger skills; verified claims
+against runtime/config/entry points and saved Phase 5/6 reports.
+Decisions: current code is authoritative; separate implemented features from
+future generation/research objectives; distinguish fresh-clone smoke commands
+from demos requiring ignored local data/artifacts. Preserve historical checkpoints.
+Verification: Python 3.12.4; full suite 526 passed in 9.07s; pip check clean;
+demo/evaluate_initial CLI help passed; fixture smoke executed and parsed;
+README Python inference example executed (local_lexical); all 14 local links
+exist; code fences balanced; git diff --check passed (LF/CRLF warnings only).
+Errors: no meaningful project bugs resolved; no Obsidian error notes created.
+Exact resume point: task complete, no remaining README work. Only README.md and
+this handoff changed. No application/config/data/model changes, new experiments,
+downloads or training. Independent final research evaluation remains blocked as
+recorded in the existing audit, outside this documentation task.
+Next agent: inspect actual Git diff before new work; preserve these updates and
+the historical checkpoints below. Do not resume an old completed implementation.
+
 ## COMPLETED dashboard explanations and unsuccessful recovery (2026-10-22)
 
 Bounded presentation-only update: explain actual ESA components/thresholds,
