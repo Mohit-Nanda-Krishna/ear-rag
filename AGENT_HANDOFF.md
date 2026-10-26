@@ -1,5 +1,29 @@
 # Agent Handoff
 
+## COMPLETED dashboard explanations and unsuccessful recovery (2026-10-22)
+
+Bounded presentation-only update: explain actual ESA components/thresholds,
+binary suitability and every evaluated CAS arithmetic; before/after scores and
+paragraph overlap/new evidence. Keep Benchmark Results unchanged. No policy,
+config, data, model or experiment changes. Read runtime ESA/CAS/pipeline/config.
+Real default-controller search in source order found first qualifying case at
+record90:2hop__728887_159109, Where is Assomada located? ESA.6387656056 ->
+vector recovery CAS3.2839490402>1 ->ESA.5719450602, ABSTAIN. Recovery EXECUTED,
+not rejected. Display adapters/tests/UI and guide reproducible command complete;
+both real examples replayed with Streamlit AppTest and no exceptions.
+No qualifying bugs logged. Preserve existing dirty work.
+
+Verification: focused dashboard tests7 passed in1.38s; full suite526 passed
+in8.31s. Mypy clean for2 dashboard modules; git diff --check exit0 (CRLF
+warnings only). All three saved benchmark groups still load. Documented replay
+Python block independently executed and reproduced ABSTAIN after recovery.
+244 source/test/config/raw/output baseline hashes compared: only dashboard.py,
+dashboard_data.py and test_dashboard.py changed; guide and this handoff also
+updated. MuSiQue source SHA remains15fa63794d18a94ce12411aca6e2327e65b6e83b0b1490efab3f1962e48abf3b.
+No controller/retrieval/ESA/CAS changes, new dependencies, benchmarks or training.
+No further work pending for this task; independent final evaluation remains
+pending. No qualifying error notes created (expected red tests only).
+
 ## COMPLETED local supervisor dashboard (2026-10-22)
 
 Two Streamlit tabs implemented in src/ear_rag/dashboard.py; dashboard_data.py

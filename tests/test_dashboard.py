@@ -64,6 +64,10 @@ def test_ui_runs_synthetic_controller_and_hides_stale_result(tmp_path, monkeypat
     assert [tab.label for tab in app.tabs] == ['Live Query Demo', 'Benchmark Results']
     app.button[0].click().run()
     assert not app.exception and int(app.metric[2].value) >= 1
+    assert any('CAS > tau:' in item.value for item in app.code)
+    assert any('uncertain' in item.value and 'insufficient' in item.value for item in app.markdown)
+    score_tables = [item.value for item in app.dataframe if 'Difference' in item.value.columns]
+    assert len(score_tables) == 1 and len(score_tables[0]) == 5
     app.selectbox[0].select('q2').run()
     assert not app.exception and not app.metric
 
@@ -79,3 +83,41 @@ def test_trained_artifact_and_malformed_report(tmp_path):
     (directory/'results.json').write_text('{bad')
     tables,errors=load_benchmarks(tmp_path,{'Trained':('trained','trained')})
     assert tables['Trained']==[] and len(errors)==1
+
+
+def test_candidate_display_preserves_runtime_arithmetic_and_strict_boundary():
+    from ear_rag.dashboard_data import candidate_rows
+    result = {'initial': {'assessment': {'overall_score': .89}},
+              'configuration': load_config(),
+              'decision': {'parameters': {}, 'metadata': {'cas_threshold': 1.0, 'recover': False,
+                  'candidate_evaluations': [
+                      {'backend': 'vector_flat', 'eligible': True, 'suitability': 1.0,
+                       'reason': 'missing query tokens', 'evidence_deficiency': .11,
+                       'raw_incremental_cost': .11, 'incremental_cost': .11, 'cas': 1.0,
+                       'estimated_work': {'retrieval_calls': 1, 'retrieved_chunks': 5, 'latency_ms': 10}},
+                      {'backend': 'local_lexical', 'eligible': False, 'suitability': 0.0,
+                       'reason': 'backend already attempted'}]}}}
+    before = json.dumps(result)
+    rows = candidate_rows(result)
+    assert rows[0]['CAS'] == 1 and rows[0]['Threshold passed'] is False
+    assert rows[0]['Suitability (0/1)'] == 1 and rows[0]['Nominal latency ms'] == 10
+    assert '(1 - 0.89)' in rows[0]['Arithmetic'] and '/ 0.11' in rows[0]['Arithmetic']
+    assert rows[1]['CAS'] is None and rows[1]['Threshold passed'] is None
+    assert 'not evaluated' in rows[1]['Arithmetic']
+    assert json.dumps(result) == before
+
+
+def test_score_comparison_and_paragraph_sets_preserve_duplicate_rank_entries():
+    from ear_rag.dashboard_data import compare_stages
+    initial = {'assessment': dict(overall_score=.6,relevance=.4,coverage=.5,support=.5,consistency=1),
+               'evidence': [{'paragraph_idx': i} for i in [0,2,8,19,13]]}
+    recovery = {'assessment': dict(overall_score=.55,relevance=.2,coverage=.5,support=.5,consistency=1),
+                'evidence': [{'paragraph_idx': i} for i in [2,4,13,12,12]]}
+    rows, paragraphs = compare_stages({'initial':initial,'recovery':recovery})
+    assert rows[0]['Difference'] == pytest.approx(-.05)
+    assert paragraphs == {'Initial (rank order)': [0,2,8,19,13],
+                          'Recovery (rank order)': [2,4,13,12,12],
+                          'New in recovery': [4,12], 'Overlap': [2,13], 'Initial only': [0,8,19]}
+    rows, paragraphs = compare_stages({'initial':initial,'recovery':None})
+    assert all(row['Difference']==0 for row in rows)
+    assert paragraphs['Recovery (rank order)'] is None

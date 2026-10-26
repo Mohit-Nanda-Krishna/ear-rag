@@ -10,16 +10,65 @@ from typing import Any
 from ear_rag.condition_evaluation import CONDITIONS, _pipeline
 from ear_rag.data.musique import MuSiQueDataset
 from ear_rag.data.musique_evidence import build_question_corpus
-from ear_rag.routing.cost_awareness import DEFAULT_WORK, incremental_cost
+from ear_rag.routing.cost_awareness import DEFAULT_WORK, MINIMUM_COST, incremental_cost
 
 ROOT = Path(__file__).resolve().parents[2]
 DATASET = ROOT / 'data/raw/musique/official_v1_0/musique_ans_v1.0_dev.jsonl'
 EXAMPLE = '2hop__152700_141308'
+UNSUCCESSFUL_EXAMPLE = '2hop__728887_159109'
+COMPONENTS = ('overall_score', 'relevance', 'coverage', 'support', 'consistency')
 SOURCES = {
     'HotpotQA / revised CAS / known exposure': ('phase5-revised-cas-development-internal-known-exposure-20261022T125412Z-0e6adb98', 'aggregate'),
     'MuSiQue / Phase 5 / official development': ('phase5-musique-development-internal-20261022T153801Z-cfdcea73', 'aggregate'),
     'MuSiQue / Phase 6A / trained-router development': ('phase6a-router-development-20261022T155210Z-95732e1d', 'trained'),
 }
+
+
+def candidate_rows(result: dict[str, Any]) -> list[dict[str, Any]]:
+    """Present recorded candidate arithmetic, never evaluate a skipped action."""
+    decision = result['decision']
+    metadata = decision['metadata']
+    esa = result['initial']['assessment']['overall_score']
+    threshold = metadata['cas_threshold']
+    configured = result['configuration']['recovery']['cost_awareness'].get('incremental_work', DEFAULT_WORK)
+    rows = []
+    for candidate in metadata['candidate_evaluations']:
+        backend = candidate['backend']
+        work = candidate.get('estimated_work', configured.get(backend, {}))
+        cas, cost = candidate.get('cas'), candidate.get('incremental_cost')
+        arithmetic = 'CAS not evaluated by controller: ' + candidate['reason']
+        if cas is not None:
+            arithmetic = (
+                f"C = max(0.05*{work['retrieval_calls']} + 0.01*{work['retrieved_chunks']} "
+                f"+ 0.001*{work['latency_ms']}, {MINIMUM_COST}) "
+                f"= max({candidate['raw_incremental_cost']}, {MINIMUM_COST}) = {cost}\n"
+                f"CAS = (1 - {esa}) * {candidate['suitability']} / {cost}\n"
+                f"    = {candidate['evidence_deficiency']} * {candidate['suitability']} / {cost} = {cas}\n"
+                f"CAS > tau: {cas} > {threshold} is {cas > threshold}")
+        rows.append({'Backend': backend, 'Eligible': candidate['eligible'],
+                     'Suitability (0/1)': int(candidate['suitability']) if 'suitability' in candidate else None,
+                     'Actual reason': candidate['reason'], 'Current ESA': esa,
+                     'Deficiency (1 - ESA)': metadata.get('evidence_deficiency', 1 - esa),
+                     'Nominal calls': work.get('retrieval_calls'), 'Nominal returned chunks': work.get('retrieved_chunks'),
+                     'Nominal latency ms': work.get('latency_ms'), 'Nominal cost': cost, 'CAS': cas,
+                     'Threshold': threshold, 'Threshold passed': cas > threshold if cas is not None else None,
+                     'Selected for execution': bool(metadata['recover'] and decision['parameters'].get('backend') == backend),
+                     'Arithmetic': arithmetic})
+    return rows
+
+
+def compare_stages(result: dict[str, Any]) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Compare actual final context (replacement, not union) with initial context."""
+    initial, recovery = result['initial'], result['recovery']
+    final = recovery or initial
+    rows = [{'Component': name, 'Initial': initial['assessment'][name], 'Final': final['assessment'][name],
+             'Difference': final['assessment'][name] - initial['assessment'][name]} for name in COMPONENTS]
+    indices = [item['paragraph_idx'] for item in initial['evidence'] if item['paragraph_idx'] is not None]
+    after = [item['paragraph_idx'] for item in recovery['evidence'] if item['paragraph_idx'] is not None] if recovery else None
+    return rows, {'Initial (rank order)': indices, 'Recovery (rank order)': after,
+                  'New in recovery': sorted(set(after or []) - set(indices)),
+                  'Overlap': sorted(set(after or []) & set(indices)),
+                  'Initial only': sorted(set(indices) - set(after or []))}
 
 
 def run_question(dataset: MuSiQueDataset, question_id: str, config: dict[str, Any]) -> dict[str, Any]:

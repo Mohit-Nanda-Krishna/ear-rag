@@ -13,7 +13,8 @@ required because this command uses the existing environment directly. Streamlit
 1.66.1 is installed; optional reproducible UI setup is
 `.\ai-proj-new\Scripts\python.exe -m pip install -r requirements-dashboard.txt`.
 
-1. **Live Query Demo:** the verified MuSiQue ID below is selected first. Read its
+1. **Live Query Demo:** the verified successful MuSiQue ID below is selected first;
+   the second option is recovery executed followed by ABSTAIN. Read its
    exact question, then click **Run actual controller**. Walk through the numbered
    trace: query analysis/selection, initial retrieval/ESA, deterministic CAS,
    recovery/reassessment and final evidence status. Expand evidence to show native
@@ -45,10 +46,110 @@ the limitation explained below remains unchanged. Missing dataset/artifact error
 are shown explicitly. A browser screenshot could not be checked in this session
 because no browser control surface was available; AppTest exercised both tabs.
 
+### Reading the expanded ESA/CAS trace
+
+The dashboard shows configured thresholds, currently sufficient >=0.70,
+uncertain >=0.40 and <0.70, insufficient <0.40. Below0.70 means recovery is
+considered, not guaranteed. ESA is the configured weighted mean (currently equal
+0.25 weights): relevance=max positive retrieval score r/(1+r); coverage=distinct
+query tokens found in chunk text / distinct query tokens; support=coverage times
+min(1,chunk count/2); consistency=distinct normalized chunk texts / chunk count.
+Empty evidence gives zero signals. These are proxies, not factual verification.
+
+Binary suitability is action applicability, not predicted success. Every candidate
+shows its actual eligibility/reason. Evaluated candidates display current ESA,
+deficiency, suitability, configured NEXT-action calls/chunks/latency, cost-floor
+arithmetic, CAS and strict comparison with tau. Equality does not qualify. An
+ineligible candidate's CAS/cost is not evaluated by the controller and stays blank.
+Configured nominal work assumptions are separate from measured retrieval calls,
+returned chunks and retrieval-only latency; neither is monetary cost. Initial
+retrieval work is not charged again in a candidate's incremental CAS denominator.
+The before/after table shows all four components, overall ESA and signed changes.
+Evidence lists show native paragraph indices in rank order (including duplicates),
+unique overlap/new indices, and NEW/OVERLAP markers on recovery chunks. Recovery
+replaces the context rather than combining it with initial evidence.
+
+### Verified unsuccessful recovery: executed, then ABSTAIN (2026-10-22)
+
+- ID: **`2hop__728887_159109`** (second dashboard option).
+- Exact question: **Where is Assomada located?**
+- Source/split: official MuSiQue-Ans v1.0 **dev**, native question-scoped paragraphs;
+  `data/raw/musique/official_v1_0/musique_ans_v1.0_dev.jsonl`.
+- Source SHA-256: `15fa63794d18a94ce12411aca6e2327e65b6e83b0b1490efab3f1962e48abf3b`.
+- Search: examined **90 records**, in validated native source order, stopping at
+  the first case with initial ESA < configured sufficient threshold, accepted AND
+  executed recovery, post-recovery ESA < threshold, and final status ABSTAIN.
+  All candidate runs used `run_question` -> existing `_pipeline` -> actual
+  `RetrievalControlPipeline.run`, unchanged default configuration. This was a
+  bounded demo-example search, not a benchmark or effectiveness estimate.
+
+| Observable | Initial | Recovery / final |
+|---|---:|---:|
+| Backend | local_lexical (no-signal router fallback) | vector_flat |
+| Relevance | .5550624223310153 | .2877802408103251 |
+| Coverage | .5 | .5 |
+| Support | .5 | .5 |
+| Consistency | 1 | 1 |
+| Overall ESA | .6387656055827539 | .5719450602025813 |
+| Decision | uncertain | uncertain |
+| Underlying retrieval calls | 1 | 1 additional |
+| Returned chunks | 5 | 5 additional |
+
+ESA decreased by **.0668205453801726**; it remained below.70. Suitability S=1
+for vector and hybrid because query tokens were missing from initial evidence.
+Deficiency=1-.6387656055827539=.36123439441724614. Vector nominal work is
+1 call,5 returned chunks,10ms: C=max(.05*1+.01*5+.001*10,.05)=.11.
+Vector CAS=.36123439441724614*1/.11=**3.283949040156783 >1**. Hybrid nominal
+work2/5/20 gives C=.17, CAS=2.124908202454389>1; vector wins. Lexical has S=0
+(already attempted), multi-hop S=0 (dependency indicator absent/false); neither
+has a runtime CAS evaluation. The actual alternative_retriever action selected
+vector_flat, accepted recovery, executed it, and performed mandatory reassessment.
+With the configured one-round limit, the controller terminated **ABSTAIN**.
+This demonstrates that suitability and CAS acceptance do not guarantee improvement.
+
+Actual retrieved native paragraphs (chunk indices preserve window identity):
+
+| Stage | Rank-ordered paragraph / chunk / title |
+|---|---|
+| Initial | 0/0 Tourism in Nepal; 2/0 WCNL; 8/0 Hakauata; 19/0 Fatumanongi; 13/0 Antoñana |
+| Recovery | 2/0 WCNL; 4/1 RTC (Cape Verde); 13/0 Antoñana; 12/0 Reduced level; 12/1 Reduced level |
+
+New parent paragraphs=[4,12], overlap=[2,13], initial-only=[0,8,19]. The
+recovered WCNL text describes a New Hampshire radio station; RTC chunk1 describes
+radio/TV broadcasting in Cape Verde; Antoñana describes a Spanish town; Reduced
+level chunks describe surveying datums/benchmarks. The UI expands the exact text.
+These are retrieved evidence descriptions, not claims of supporting relevance.
+Measured totals were2 calls,10 returned chunks, one observed retrieval-only
+latency.1456999744ms (timing varies). Nominal initial+executed recovery=.11+.11=.22.
+No gold support labels were used for query analysis, retrieval, ESA or recovery.
+
+Reproduce the complete actual trace, including exact retrieved text and per-stage
+measured work, from `C:\ear-rag` in PowerShell:
+
+```powershell
+@'
+import json
+from ear_rag.config.loader import load_config
+from ear_rag.dashboard_data import DATASET, run_question, candidate_rows, compare_stages
+from ear_rag.data.musique import read_musique
+dataset = read_musique(DATASET, source_split="dev")
+result = run_question(dataset, "2hop__728887_159109", load_config())
+print(json.dumps(result, indent=2, ensure_ascii=True))
+print(json.dumps(candidate_rows(result), indent=2))
+print(json.dumps(compare_stages(result), indent=2))
+'@ | .\ai-proj-new\Scripts\python.exe -B -
+```
+
+All displayed outcomes still come from each live run. The dashboard warns if this
+saved example does not reproduce. ANSWERABLE means ESA passed, not a generated
+or verified natural-language answer. This unsuccessful-recovery example does not
+resolve the separate absence of a genuine recovery-rejection example below.
+
 ## Verified native real-data replay (2026-10-22)
 
-Use this section for the current CAS policy; older menu excerpts below remain
-historical. One requested scenario is reproducible; the requested recovery-rejected
+Use this section for the successful example and the separate rejection question;
+the unsuccessful executed recovery is documented above. Older menu excerpts below
+remain historical. The successful scenario is reproducible; the recovery-rejected
 scenario is unavailable under the unchanged default configuration. Do not stage
 it by disabling recovery, changing thresholds, hiding backends or inventing output.
 
